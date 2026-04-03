@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model SuperAdmin {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  dairies   Dairy[]
+}
+
+model Dairy {
+  id           String      @id @default(uuid())
+  name         String
+  ownerName    String
+  mobile       String
+  address      String?
+  isActive     Boolean     @default(true)
+  accessPaidAt DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  superAdminId String
+  superAdmin   SuperAdmin  @relation(fields: [superAdminId], references: [id])
+  admins       Admin[]
+  farmers      Farmer[]
+  milkEntries  MilkEntry[]
+  payments     Payment[]
+  rateConfig   RateConfig?
+}
+
+model Admin {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  name      String
+  dairyId   String
+  dairy     Dairy    @relation(fields: [dairyId], references: [id])
+  language  String   @default("hinglish")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RateConfig {
+  id              String   @id @default(uuid())
+  dairyId         String   @unique
+  dairy           Dairy    @relation(fields: [dairyId], references: [id])
+  fatRatePerKg    Float    @default(800.0)
+  snfRatePerKg    Float    @default(533.0)
+  minRatePerLiter Float    @default(40.0)
+  useMinRate      Boolean  @default(true)
+  milkType        String   @default("mixed")
+  updatedAt       DateTime @updatedAt @default(now())
+}
+
+model Farmer {
+  id          String      @id @default(uuid())
+  name        String
+  mobile      String
+  code        String
+  village     String
+  isActive    Boolean     @default(true)
+  dairyId     String
+  dairy       Dairy       @relation(fields: [dairyId], references: [id])
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  milkEntries MilkEntry[]
+  payments    Payment[]
+
+  @@unique([mobile, dairyId])
+  @@unique([code, dairyId])
+  @@index([dairyId])
+}
+
+model MilkEntry {
+  id           String   @id @default(uuid())
+  farmerId     String
+  farmer       Farmer   @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  dairyId      String
+  dairy        Dairy    @relation(fields: [dairyId], references: [id])
+  date         DateTime
+  shift        Shift    @default(MORNING)
+  liters       Float
+  fatPercent   Float
+  snfPercent   Float
+  fatKg        Float    @default(0)
+  snfKg        Float    @default(0)
+  fatAmount    Float    @default(0)
+  snfAmount    Float    @default(0)
+  ratePerLiter Float
+  totalAmount  Float
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([farmerId])
+  @@index([dairyId])
+  @@index([date])
+  @@index([dairyId, date])
+}
+
+model Payment {
+  id        String   @id @default(uuid())
+  farmerId  String
+  farmer    Farmer   @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  dairyId   String
+  dairy     Dairy    @relation(fields: [dairyId], references: [id])
+  amount    Float
+  note      String?
+  paidAt    DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([farmerId])
+  @@index([dairyId])
+  @@index([dairyId, paidAt])
+}
+
+enum Shift {
+  MORNING
+  EVENING
+}
