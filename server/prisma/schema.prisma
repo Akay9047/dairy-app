@@ -48,14 +48,7 @@ model Admin {
   updatedAt DateTime @updatedAt
 }
 
-rateConfig: {
-  create: { 
-    minRatePerLiter: 50,
-    fatRatePerKg: 0.33,
-    snfRatePerKg: 0.21,
-    useMinRate: true 
-  },
-},
+
 
 
 model Farmer {
@@ -123,4 +116,16 @@ model Payment {
 enum Shift {
   MORNING
   EVENING
+}
+
+model RateConfig {
+  id              String   @id @default(uuid())
+  dairyId         String   @unique
+  dairy           Dairy    @relation(fields: [dairyId], references: [id])
+  fatRatePerKg    Float    @default(800.0)
+  snfRatePerKg    Float    @default(533.0)
+  minRatePerLiter Float    @default(40.0)
+  useMinRate      Boolean  @default(true)
+  milkType        String   @default("mixed")
+  updatedAt       DateTime @updatedAt @default(now())
 }
