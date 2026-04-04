@@ -1,13 +1,18 @@
 import axios from "axios";
 
-export const api = axios.create({ baseURL: "/api", headers: { "Content-Type": "application/json" } });
+// Production mein Render URL use karo, local mein proxy
+const BASE_URL = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : "/api";
 
-// Smart token selector — super admin aur admin ke alag tokens
+export const api = axios.create({ 
+  baseURL: BASE_URL, 
+  headers: { "Content-Type": "application/json" } 
+});
+
 function getToken(): string | null {
   const isSuperPage = window.location.pathname.startsWith("/super");
-  if (isSuperPage) {
-    return localStorage.getItem("dairy_sa_token");
-  }
+  if (isSuperPage) return localStorage.getItem("dairy_sa_token");
   return localStorage.getItem("dairy_admin_token");
 }
 
@@ -75,6 +80,8 @@ export const reportsApi = {
     api.get(`/reports/farmer/${farmerId}`, { params: p }).then(r => r.data),
   monthly: (p?: { month?: number; year?: number }) =>
     api.get("/reports/monthly", { params: p }).then(r => r.data),
+  weekly: (p?: { from?: string; to?: string }) =>
+    api.get("/reports/weekly", { params: p }).then(r => r.data),
   exportCsv: (p?: { from?: string; to?: string; farmerId?: string }) =>
     api.get("/reports/export/csv", { params: p, responseType: "blob" }).then(r => r.data),
 };
@@ -106,9 +113,4 @@ export const superAdminApi = {
   updateRates: (id: string, d: unknown) => api.put(`/superadmin/dairies/${id}/rates`, d).then(r => r.data),
   changeAdminPassword: (dairyId: string, adminId: string, newPassword: string) =>
     api.patch(`/superadmin/dairies/${dairyId}/admin/${adminId}/password`, { newPassword }).then(r => r.data),
-};
-
-export const reportsApiExtra = {
-  weekly: (params?: { from?: string; to?: string }) =>
-    api.get("/reports/weekly", { params }).then(r => r.data),
 };

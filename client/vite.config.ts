@@ -3,11 +3,14 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    outDir: "dist",
+  },
   server: {
     port: 5173,
     proxy: {
       "/api": {
-        target: "http://localhost:4000",
+        target: "https://dairy-app-nx0c.onrender.com",
         changeOrigin: true,
       },
     },
