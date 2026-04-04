@@ -92,8 +92,8 @@ router.post("/setup", async (req: Request, res: Response) => {
     if (saCount > 0) return res.status(400).json({ error: "Already setup ho chuka hai" });
 
     const { username = "superadmin", password = "super@1234", name = "Super Admin",
-      dairyName = "Main Dairy", ownerName = "Dairy Owner", mobile = "9999999999",
-      adminUsername = "admin", adminPassword = "dairy@1234" } = req.body;
+            dairyName = "Main Dairy", ownerName = "Dairy Owner", mobile = "9999999999",
+            adminUsername = "admin", adminPassword = "dairy@1234" } = req.body;
 
     const saHash = await bcrypt.hash(password, 10);
     const adminHash = await bcrypt.hash(adminPassword, 10);
@@ -107,7 +107,7 @@ router.post("/setup", async (req: Request, res: Response) => {
         name: dairyName, ownerName, mobile,
         superAdminId: sa.id,
         rateConfig: {
-          create: { minRatePerLiter: 50, fatRatePerKg: 0.33, snfRatePerKg: 0.21, useMinRate: true },
+          create: { minRatePerLiter: 50, fatRatePerUnit: 0.33, snfRatePerUnit: 0.21, useMinRate: true },
         },
         admins: {
           create: { username: adminUsername, password: adminHash, name: ownerName, language: "hinglish" },
@@ -157,3 +157,30 @@ router.patch("/change-password", async (req: Request, res: Response) => {
   }
 });
 
+// Super Admin apna password change kare
+router.patch("/super/change-password", async (req: Request, res: Response) => {
+  try {
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    if (!token) return res.status(401).json({ error: "Unauthorized" });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret") as { superAdminId: string };
+    if (!decoded.superAdminId) return res.status(403).json({ error: "Super admin only" });
+
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword)
+      return res.status(400).json({ error: "Current aur new password dono zaroori hain" });
+    if (newPassword.length < 6)
+      return res.status(400).json({ error: "Password kam se kam 6 characters ka hona chahiye" });
+
+    const sa = await prisma.superAdmin.findUnique({ where: { id: decoded.superAdminId } });
+    if (!sa) return res.status(404).json({ error: "Super admin nahi mila" });
+
+    const valid = await bcrypt.compare(currentPassword, sa.password);
+    if (!valid) return res.status(400).json({ error: "Current password galat hai" });
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await prisma.superAdmin.update({ where: { id: decoded.superAdminId }, data: { password: hashed } });
+    res.json({ message: "Password change ho gaya! ✅" });
+  } catch {
+    res.status(500).json({ error: "Password change nahi hua" });
+  }
+});

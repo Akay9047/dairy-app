@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { superAdminApi } from "../lib/api";
+import { superAdminApi, authApi } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -288,6 +288,62 @@ function DairyDetail({ dairyId, onBack }: { dairyId: string; onBack: () => void 
 
 // ── Main SuperAdmin Page ─────────────────────────────────────────
 
+
+function SAChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const [current, setCurrent] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPw !== confirm) { toast.error("Passwords match nahi!"); return; }
+    if (newPw.length < 6) { toast.error("Min 6 characters chahiye"); return; }
+    setLoading(true);
+    try {
+      await authApi.superChangePassword(current, newPw);
+      toast.success("Password change ho gaya! ✅ Dobara login karein.");
+      onClose();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error ?? "Password change nahi hua");
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h2 className="font-semibold text-gray-900">Apna Password Change Karein</h2>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-4 space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Current Password *</label>
+            <input type="password" className="input-field" placeholder="Purana password"
+              value={current} onChange={e => setCurrent(e.target.value)} required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Naya Password *</label>
+            <input type="password" className="input-field" placeholder="Min 6 characters"
+              value={newPw} onChange={e => setNewPw(e.target.value)} required minLength={6} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password *</label>
+            <input type="password" className="input-field" placeholder="Dobara likhein"
+              value={confirm} onChange={e => setConfirm(e.target.value)} required />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={onClose} className="btn-secondary flex-1">Ruko</button>
+            <button type="submit" disabled={loading} className="btn-primary flex-1">
+              {loading ? "Saving..." : "Change Karein"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function SuperAdminPage() {
   const { admin, logout } = useAuth();
   const navigate = useNavigate();
@@ -296,6 +352,7 @@ export default function SuperAdminPage() {
   const [ratesModal, setRatesModal] = useState<Dairy | null>(null);
   const [pwModal, setPwModal] = useState<{ dairy: Dairy; admin: { id: string; username: string; name: string } } | null>(null);
   const [selectedDairyId, setSelectedDairyId] = useState<string | null>(null);
+  const [showSAPwModal, setShowSAPwModal] = useState(false);
 
   const { data: stats } = useQuery({ queryKey: ["sa-stats"], queryFn: superAdminApi.stats, refetchInterval: 30000 });
   const { data: dairies = [], isLoading } = useQuery({ queryKey: ["sa-dairies"], queryFn: superAdminApi.dairies });
@@ -329,9 +386,14 @@ export default function SuperAdminPage() {
             <p className="text-xs text-gray-500">Welcome, {admin?.name}</p>
           </div>
         </div>
-        <button onClick={handleLogout} className="flex items-center gap-1.5 text-sm text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg">
-          <LogOut size={14} /> Logout
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowSAPwModal(true)} className="flex items-center gap-1.5 text-sm text-gray-600 hover:bg-gray-100 px-3 py-1.5 rounded-lg">
+            <KeyRound size={14} /> Password
+          </button>
+          <button onClick={handleLogout} className="flex items-center gap-1.5 text-sm text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg">
+            <LogOut size={14} /> Logout
+          </button>
+        </div>
       </div>
 
       <div className="p-4 md:p-6 space-y-5">
@@ -434,6 +496,7 @@ export default function SuperAdminPage() {
       {createModal && <CreateDairyModal onClose={() => setCreateModal(false)} />}
       {ratesModal && <RatesModal dairy={ratesModal} onClose={() => setRatesModal(null)} />}
       {pwModal && <ChangePasswordModal dairy={pwModal.dairy} admin={pwModal.admin} onClose={() => setPwModal(null)} />}
+      {showSAPwModal && <SAChangePasswordModal onClose={() => setShowSAPwModal(false)} />}
     </div>
   );
 }
