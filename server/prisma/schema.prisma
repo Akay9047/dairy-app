@@ -34,6 +34,9 @@ model Dairy {
   milkEntries  MilkEntry[]
   payments     Payment[]
   rateConfig   RateConfig?
+
+  @@index([superAdminId])
+  @@index([isActive])
 }
 
 model Admin {
@@ -46,10 +49,21 @@ model Admin {
   language  String   @default("hinglish")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([dairyId])
 }
 
-
-
+model RateConfig {
+  id              String   @id @default(uuid())
+  dairyId         String   @unique
+  dairy           Dairy    @relation(fields: [dairyId], references: [id])
+  fatRatePerKg    Float    @default(800.0)
+  snfRatePerKg    Float    @default(533.0)
+  minRatePerLiter Float    @default(40.0)
+  useMinRate      Boolean  @default(true)
+  milkType        String   @default("mixed")
+  updatedAt       DateTime @updatedAt @default(now())
+}
 
 model Farmer {
   id          String      @id @default(uuid())
@@ -67,6 +81,7 @@ model Farmer {
 
   @@unique([mobile, dairyId])
   @@unique([code, dairyId])
+  @@index([dairyId, isActive])
   @@index([dairyId])
 }
 
@@ -90,10 +105,10 @@ model MilkEntry {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  @@index([farmerId])
-  @@index([dairyId])
+  @@index([dairyId, date(sort: Desc)])
+  @@index([farmerId, date(sort: Desc)])
+  @@index([dairyId, farmerId])
   @@index([date])
-  @@index([dairyId, date])
 }
 
 model Payment {
@@ -108,24 +123,12 @@ model Payment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([dairyId, paidAt(sort: Desc)])
   @@index([farmerId])
   @@index([dairyId])
-  @@index([dairyId, paidAt])
 }
 
 enum Shift {
   MORNING
   EVENING
-}
-
-model RateConfig {
-  id              String   @id @default(uuid())
-  dairyId         String   @unique
-  dairy           Dairy    @relation(fields: [dairyId], references: [id])
-  fatRatePerKg    Float    @default(800.0)
-  snfRatePerKg    Float    @default(533.0)
-  minRatePerLiter Float    @default(40.0)
-  useMinRate      Boolean  @default(true)
-  milkType        String   @default("mixed")
-  updatedAt       DateTime @updatedAt @default(now())
 }

@@ -1,11 +1,11 @@
 import { Router, Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { authMiddleware, AuthRequest } from "../middleware/auth";
+import { authMiddleware, adminOnly, AuthRequest } from "../middleware/auth";
 import { calculateRates, DEFAULT_RATE_CONFIG, RateConfig } from "../lib/rateCalc";
 
 const router = Router();
-router.use(authMiddleware);
+router.use(authMiddleware, adminOnly);
 
 async function getRateConfig(dairyId: string): Promise<RateConfig> {
   const config = await prisma.rateConfig.findUnique({ where: { dairyId } });
@@ -21,19 +21,21 @@ async function getRateConfig(dairyId: string): Promise<RateConfig> {
 
 const MilkSchema = z.object({
   farmerId: z.string().uuid(),
-  date: z.string(),
+  date: z.string().datetime(),
   shift: z.enum(["MORNING", "EVENING"]).default("MORNING"),
-  liters: z.number().positive("Liters positive hona chahiye").max(500),
-  fatPercent: z.number().min(0.1, "Fat % 0.1 se zyada hona chahiye").max(15),
+  liters: z.number().positive().max(1000, "Max 1000 liters per entry"),
+  fatPercent: z.number().min(0.1).max(15),
 });
 
-// IMPORTANT: All queries filter by dairyId — data isolation guaranteed
 router.get("/", async (req: AuthRequest, res: Response) => {
   try {
     const { farmerId, from, to, shift, page = "1", limit = "50" } = req.query;
-    const skip = (parseInt(String(page)) - 1) * parseInt(String(limit));
+    const pageNum = Math.max(1, parseInt(String(page)));
+    const limitNum = Math.min(100, Math.max(1, parseInt(String(limit))));
+    const skip = (pageNum - 1) * limitNum;
+
     const where = {
-      dairyId: req.dairyId!, // ← Security: only this dairy's data
+      dairyId: req.dairyId!,
       ...(farmerId ? { farmerId: String(farmerId) } : {}),
       ...(shift ? { shift: String(shift) as "MORNING" | "EVENING" } : {}),
       ...(from || to ? { date: {
@@ -41,21 +43,22 @@ router.get("/", async (req: AuthRequest, res: Response) => {
         ...(to ? { lte: new Date(String(to)) } : {}),
       }} : {}),
     };
+
     const [entries, total] = await Promise.all([
       prisma.milkEntry.findMany({
-        where, skip, take: parseInt(String(limit)),
+        where, skip, take: limitNum,
         include: { farmer: { select: { name: true, code: true, mobile: true, village: true } } },
         orderBy: { date: "desc" },
       }),
       prisma.milkEntry.count({ where }),
     ]);
-    res.json({ entries, total, page: parseInt(String(page)) });
-  } catch (err: any) { res.status(500).json({ error: "Entries load nahi hui" }); }
+
+    res.json({ entries, total, page: pageNum });
+  } catch { res.status(500).json({ error: "Entries load nahi hui" }); }
 });
 
 router.get("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    // dairyId check ensures no cross-dairy access
     const entry = await prisma.milkEntry.findFirst({
       where: { id: req.params.id, dairyId: req.dairyId! },
       include: { farmer: true },
@@ -69,9 +72,8 @@ router.post("/", async (req: AuthRequest, res: Response) => {
   try {
     const data = MilkSchema.parse(req.body);
 
-    // Verify farmer belongs to this dairy
     const farmer = await prisma.farmer.findFirst({
-      where: { id: data.farmerId, dairyId: req.dairyId! },
+      where: { id: data.farmerId, dairyId: req.dairyId!, isActive: true },
     });
     if (!farmer) return res.status(403).json({ error: "Yeh kisaan aapki dairy ka nahi hai" });
 
@@ -105,12 +107,12 @@ router.post("/", async (req: AuthRequest, res: Response) => {
 
 router.put("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const data = MilkSchema.partial().parse(req.body);
     const existing = await prisma.milkEntry.findFirst({
       where: { id: req.params.id, dairyId: req.dairyId! },
     });
     if (!existing) return res.status(404).json({ error: "Entry nahi mili" });
 
+    const data = MilkSchema.partial().parse(req.body);
     const liters = data.liters ?? existing.liters;
     const fatPercent = data.fatPercent ?? existing.fatPercent;
     const config = await getRateConfig(req.dairyId!);
@@ -142,7 +144,7 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
     const entry = await prisma.milkEntry.findFirst({
       where: { id: req.params.id, dairyId: req.dairyId! },
     });
-    if (!entry) return res.status(404).json({ error: "Entry nahi mili ya access nahi hai" });
+    if (!entry) return res.status(404).json({ error: "Entry nahi mili" });
     await prisma.milkEntry.delete({ where: { id: req.params.id } });
     res.json({ message: "Entry delete ho gayi" });
   } catch { res.status(500).json({ error: "Delete nahi hua" }); }

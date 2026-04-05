@@ -1,36 +1,36 @@
 import { Router, Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { authMiddleware, AuthRequest } from "../middleware/auth";
+import { authMiddleware, adminOnly, AuthRequest } from "../middleware/auth";
 
 const router = Router();
-router.use(authMiddleware);
+router.use(authMiddleware, adminOnly);
 
 const FarmerSchema = z.object({
-  name: z.string().min(1, "Naam zaroori hai"),
+  name: z.string().min(1).max(100).trim(),
   mobile: z.string().regex(/^[6-9]\d{9}$/, "Valid 10 digit mobile number daalen"),
-  code: z.string().min(1, "Code zaroori hai").max(20),
-  village: z.string().min(1, "Gaon ka naam daalen"),
+  code: z.string().min(1).max(20).trim().toUpperCase(),
+  village: z.string().min(1).max(100).trim(),
 });
 
-// All queries enforce dairyId — complete data isolation
 router.get("/", async (req: AuthRequest, res: Response) => {
   try {
-    const { search } = req.query;
+    const search = req.query.search ? String(req.query.search).slice(0, 50) : undefined;
     const farmers = await prisma.farmer.findMany({
       where: {
-        dairyId: req.dairyId!, // ← Only this dairy's farmers
+        dairyId: req.dairyId!,
         isActive: true,
         ...(search ? {
           OR: [
-            { name: { contains: String(search), mode: "insensitive" } },
-            { mobile: { contains: String(search) } },
-            { code: { contains: String(search), mode: "insensitive" } },
-            { village: { contains: String(search), mode: "insensitive" } },
+            { name: { contains: search, mode: "insensitive" } },
+            { mobile: { contains: search } },
+            { code: { contains: search, mode: "insensitive" } },
+            { village: { contains: search, mode: "insensitive" } },
           ],
         } : {}),
       },
       orderBy: { name: "asc" },
+      take: 500,
     });
     res.json(farmers);
   } catch { res.status(500).json({ error: "Farmers load nahi hue" }); }
@@ -60,9 +60,7 @@ router.post("/", async (req: AuthRequest, res: Response) => {
       },
     });
     if (existing) return res.status(400).json({ error: "Is mobile ya code se farmer pehle se hai" });
-    const farmer = await prisma.farmer.create({
-      data: { ...data, dairyId: req.dairyId! },
-    });
+    const farmer = await prisma.farmer.create({ data: { ...data, dairyId: req.dairyId! } });
     res.status(201).json(farmer);
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors[0].message });
@@ -72,9 +70,7 @@ router.post("/", async (req: AuthRequest, res: Response) => {
 
 router.put("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const existing = await prisma.farmer.findFirst({
-      where: { id: req.params.id, dairyId: req.dairyId! },
-    });
+    const existing = await prisma.farmer.findFirst({ where: { id: req.params.id, dairyId: req.dairyId! } });
     if (!existing) return res.status(404).json({ error: "Farmer nahi mila" });
     const data = FarmerSchema.partial().parse(req.body);
     const farmer = await prisma.farmer.update({ where: { id: req.params.id }, data });
@@ -87,9 +83,7 @@ router.put("/:id", async (req: AuthRequest, res: Response) => {
 
 router.delete("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const existing = await prisma.farmer.findFirst({
-      where: { id: req.params.id, dairyId: req.dairyId! },
-    });
+    const existing = await prisma.farmer.findFirst({ where: { id: req.params.id, dairyId: req.dairyId! } });
     if (!existing) return res.status(404).json({ error: "Farmer nahi mila" });
     await prisma.farmer.update({ where: { id: req.params.id }, data: { isActive: false } });
     res.json({ message: "Farmer delete ho gaya" });

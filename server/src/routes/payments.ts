@@ -1,12 +1,12 @@
 import { Router, Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { authMiddleware, AuthRequest } from "../middleware/auth";
+import { authMiddleware, adminOnly, AuthRequest } from "../middleware/auth";
+import { heavyLimiter } from "../lib/rateLimiter";
 
 const router = Router();
-router.use(authMiddleware);
+router.use(authMiddleware, adminOnly);
 
-// GET all payments — dairyId filtered
 router.get("/", async (req: AuthRequest, res: Response) => {
   try {
     const { farmerId } = req.query;
@@ -23,52 +23,58 @@ router.get("/", async (req: AuthRequest, res: Response) => {
   } catch { res.status(500).json({ error: "Payments load nahi hue" }); }
 });
 
-// GET dues — earned vs paid per farmer
-router.get("/dues", async (req: AuthRequest, res: Response) => {
+// FIXED: SQL aggregation instead of loading all records in memory
+router.get("/dues", heavyLimiter, async (req: AuthRequest, res: Response) => {
   try {
     const dairyId = req.dairyId!;
-    const farmers = await prisma.farmer.findMany({
-      where: { dairyId, isActive: true },
-      include: {
-        milkEntries: { where: { dairyId }, select: { totalAmount: true, date: true } },
-        payments: { where: { dairyId }, select: { amount: true, paidAt: true } },
-      },
-    });
 
-    const dues = farmers.map(f => {
-      const totalEarned = f.milkEntries.reduce((s, e) => s + e.totalAmount, 0);
-      const totalPaid = f.payments.reduce((s, p) => s + p.amount, 0);
-      const pending = totalEarned - totalPaid;
-      const lastEntry = f.milkEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-      const lastPayment = f.payments.sort((a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime())[0];
-      return {
-        farmerId: f.id,
-        farmerName: f.name,
-        farmerCode: f.code,
-        village: f.village,
-        mobile: f.mobile,
-        totalEarned: parseFloat(totalEarned.toFixed(2)),
-        totalPaid: parseFloat(totalPaid.toFixed(2)),
-        pending: parseFloat(pending.toFixed(2)),
-        lastEntryDate: lastEntry?.date ?? null,
-        lastPaymentDate: lastPayment?.paidAt ?? null,
-      };
-    }).filter(d => d.totalEarned > 0).sort((a, b) => b.pending - a.pending);
+    const dues = await prisma.$queryRaw<Array<{
+      farmerId: string;
+      farmerName: string;
+      farmerCode: string;
+      village: string;
+      mobile: string;
+      totalEarned: number;
+      totalPaid: number;
+      pending: number;
+    }>>`
+      SELECT
+        f.id as "farmerId",
+        f.name as "farmerName",
+        f.code as "farmerCode",
+        f.village,
+        f.mobile,
+        COALESCE(SUM(me."totalAmount"), 0)::float as "totalEarned",
+        COALESCE((SELECT SUM(p.amount) FROM "Payment" p WHERE p."farmerId" = f.id AND p."dairyId" = ${dairyId}), 0)::float as "totalPaid",
+        COALESCE(SUM(me."totalAmount"), 0)::float - COALESCE((SELECT SUM(p.amount) FROM "Payment" p WHERE p."farmerId" = f.id AND p."dairyId" = ${dairyId}), 0)::float as "pending"
+      FROM "Farmer" f
+      LEFT JOIN "MilkEntry" me ON me."farmerId" = f.id AND me."dairyId" = ${dairyId}
+      WHERE f."dairyId" = ${dairyId} AND f."isActive" = true
+      GROUP BY f.id, f.name, f.code, f.village, f.mobile
+      HAVING COALESCE(SUM(me."totalAmount"), 0) > 0
+      ORDER BY "pending" DESC
+    `;
 
-    const totalPending = dues.reduce((s, d) => s + d.pending, 0);
-    const totalEarned = dues.reduce((s, d) => s + d.totalEarned, 0);
-    const totalPaid = dues.reduce((s, d) => s + d.totalPaid, 0);
+    const totalPending = dues.reduce((s, d) => s + Number(d.pending), 0);
+    const totalEarned = dues.reduce((s, d) => s + Number(d.totalEarned), 0);
+    const totalPaid = dues.reduce((s, d) => s + Number(d.totalPaid), 0);
 
     res.json({
-      dues,
+      dues: dues.map(d => ({
+        ...d,
+        totalEarned: parseFloat(Number(d.totalEarned).toFixed(2)),
+        totalPaid: parseFloat(Number(d.totalPaid).toFixed(2)),
+        pending: parseFloat(Number(d.pending).toFixed(2)),
+      })),
       totalPending: parseFloat(totalPending.toFixed(2)),
       totalEarned: parseFloat(totalEarned.toFixed(2)),
       totalPaid: parseFloat(totalPaid.toFixed(2)),
     });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) {
+    res.status(500).json({ error: "Dues load nahi hue" });
+  }
 });
 
-// GET daily summary
 router.get("/daily-summary", async (req: AuthRequest, res: Response) => {
   try {
     const { date } = req.query;
@@ -98,20 +104,18 @@ router.get("/daily-summary", async (req: AuthRequest, res: Response) => {
       paymentsMade: paymentData._sum.amount ?? 0,
       paymentCount: paymentData._count,
     });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch { res.status(500).json({ error: "Summary load nahi hua" }); }
 });
 
-// POST create payment
 router.post("/", async (req: AuthRequest, res: Response) => {
   try {
     const data = z.object({
       farmerId: z.string().uuid(),
-      amount: z.number().positive(),
-      note: z.string().optional(),
+      amount: z.number().positive().max(10000000),
+      note: z.string().max(200).optional(),
       paidAt: z.string().optional(),
     }).parse(req.body);
 
-    // Verify farmer belongs to this dairy
     const farmer = await prisma.farmer.findFirst({
       where: { id: data.farmerId, dairyId: req.dairyId! },
     });

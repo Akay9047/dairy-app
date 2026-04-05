@@ -1,9 +1,9 @@
 import { Router, Response } from "express";
 import { prisma } from "../lib/prisma";
-import { authMiddleware, AuthRequest } from "../middleware/auth";
+import { authMiddleware, adminOnly, AuthRequest } from "../middleware/auth";
 
 const router = Router();
-router.use(authMiddleware);
+router.use(authMiddleware, adminOnly);
 
 router.get("/stats", async (req: AuthRequest, res: Response) => {
   try {
@@ -44,7 +44,7 @@ router.get("/stats", async (req: AuthRequest, res: Response) => {
       recentEntries,
       rateConfig,
     });
-  } catch (err: any) { res.status(500).json({ error: "Stats load nahi hue" }); }
+  } catch { res.status(500).json({ error: "Stats load nahi hue" }); }
 });
 
 router.get("/chart", async (req: AuthRequest, res: Response) => {
