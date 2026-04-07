@@ -1,0 +1,47 @@
+{
+    "name": "Smart Dairy Solution",
+    "short_name": "Smart Dairy",
+    "description": "Aapki Apni Digital Dairy - Rajasthan Dairy Management",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "background_color": "#fff7ed",
+    "theme_color": "#ea580c",
+    "orientation": "portrait-primary",
+    "lang": "hi",
+    "icons": [
+        {
+            "src": "/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/apple-touch-icon.png",
+            "sizes": "180x180",
+            "type": "image/png"
+        }
+    ],
+    "categories": [
+        "business",
+        "productivity"
+    ],
+    "shortcuts": [
+        {
+            "name": "Doodh Entry",
+            "url": "/milk",
+            "description": "Naya doodh entry karein"
+        },
+        {
+            "name": "Dashboard",
+            "url": "/dashboard",
+            "description": "Dashboard dekhein"
+        }
+    ]
+}

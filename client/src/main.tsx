@@ -6,7 +6,7 @@ import { Toaster } from "react-hot-toast";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { LanguageProvider } from "./hooks/useLanguage";
 import "./index.css";
- 
+
 import LoginPage from "./pages/LoginPage";
 import SuperAdminLoginPage from "./pages/SuperAdminLoginPage";
 import SuperAdminPage from "./pages/SuperAdminPage";
@@ -17,11 +17,11 @@ import MilkEntryPage from "./pages/MilkEntryPage";
 import ReportsPage from "./pages/ReportsPage";
 import PaymentsPage from "./pages/PaymentsPage";
 import DuesPage from "./pages/DuesPage";
- 
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30000 } },
 });
- 
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { admin, isLoading } = useAuth();
   if (isLoading) return (
@@ -29,11 +29,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       <div className="text-center"><div className="text-4xl mb-2">🐄</div><p className="text-gray-500">Loading...</p></div>
     </div>
   );
-  // Admin login check — role must be "admin" not "superadmin"
   if (!admin || admin.role !== "admin") return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
- 
+
 function SuperAdminRoute({ children }: { children: React.ReactNode }) {
   const { admin, isLoading } = useAuth();
   if (isLoading) return (
@@ -44,7 +43,7 @@ function SuperAdminRoute({ children }: { children: React.ReactNode }) {
   if (!admin || admin.role !== "superadmin") return <Navigate to="/super/login" replace />;
   return <>{children}</>;
 }
- 
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -76,8 +75,16 @@ function App() {
     </QueryClientProvider>
   );
 }
- 
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode><App /></React.StrictMode>
 );
- 
+
+// Register Service Worker for PWA
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js")
+      .then(() => console.log("SW registered"))
+      .catch((err) => console.log("SW error:", err));
+  });
+}
