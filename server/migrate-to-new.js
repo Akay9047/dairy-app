@@ -13,11 +13,9 @@ async function main() {
     console.log("✅ Already migrated!\n");
     const admins = await prisma.admin.findMany({ include: { dairy: true } });
     admins.forEach(a => console.log(`  Admin: ${a.username} | Dairy: ${a.dairy.name}`));
-    console.log("\nLogin: http://localhost:5173");
     return;
   }
 
-  console.log("📦 Setting up new system...\n");
   const saHash = await bcrypt.hash("super@1234", 10);
   const superAdmin = await prisma.superAdmin.create({
     data: { username: "superadmin", password: saHash, name: "Super Admin" },
@@ -31,11 +29,12 @@ async function main() {
       superAdminId: superAdmin.id, isActive: true,
       rateConfig: {
         create: {
-          fatRatePerKg: 800.0,
-          snfRatePerKg: 533.0,
-          minRatePerLiter: 40.0,
-          useMinRate: true,
-          milkType: "mixed",
+          rateType: "fat",
+          fatRatePerKg: 800, snfRatePerKg: 533,
+          minRatePerLiter: 40, useMinRate: true,
+          buffaloFatRate: 800, cowFatRate: 600,
+          buffaloSnfRate: 533, cowSnfRate: 400,
+          buffaloFixedRate: 60, cowFixedRate: 40,
         },
       },
       admins: {
@@ -45,15 +44,9 @@ async function main() {
   });
 
   console.log("✅ Admin: admin / dairy@1234");
-  console.log("\n========================================");
-  console.log("🎉 Migration complete!\n");
-  console.log("   Admin Login  → admin / dairy@1234");
-  console.log("   Super Admin  → superadmin / super@1234");
-  console.log("\n   Rate Formula (Rajasthan Standard):");
-  console.log("   Fat Rate: ₹800/kg fat");
-  console.log("   SNF Rate: ₹533/kg SNF");
-  console.log("   Min Rate: ₹40/liter");
-  console.log("========================================\n");
+  console.log("\n🎉 Migration complete!");
+  console.log("   Admin    → admin / dairy@1234");
+  console.log("   SuperAdmin → superadmin / super@1234\n");
 }
 
 main()

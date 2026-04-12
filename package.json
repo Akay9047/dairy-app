@@ -14,6 +14,7 @@
     "db:studio": "cd server && npx prisma studio"
   },
   "devDependencies": {
+    "@types/helmet": "^0.0.48",
     "concurrently": "^8.2.2"
   }
 }
