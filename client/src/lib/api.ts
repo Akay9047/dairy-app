@@ -101,6 +101,11 @@ export const notifyApi = {
   sms: (entryId: string) => api.post(`/notify/sms/${entryId}`).then(r => r.data),
 };
 
+export const rateSettingsApi = {
+  get: () => api.get("/rate-settings").then(r => r.data),
+  update: (d: unknown) => api.put("/rate-settings", d).then(r => r.data),
+};
+
 export const superAdminApi = {
   stats: () => api.get("/superadmin/stats").then(r => r.data),
   dairies: () => api.get("/superadmin/dairies").then(r => r.data),

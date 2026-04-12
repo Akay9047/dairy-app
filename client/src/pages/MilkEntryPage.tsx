@@ -12,6 +12,7 @@ import ReceiptModal from "../components/receipt/Receipt";
 interface Farmer { id: string; name: string; code: string; village: string; mobile: string; }
 interface MilkEntry {
   id: string; date: string; shift: "MORNING" | "EVENING";
+  milkType?: "BUFFALO" | "COW" | "MIXED";
   liters: number; fatPercent: number; snfPercent?: number;
   fatRate: number; snfRate?: number; ratePerLiter: number; totalAmount: number;
   farmer: Farmer;
@@ -37,6 +38,7 @@ function MilkModal({ entry, farmers, onClose }: { entry?: MilkEntry; farmers: Fa
     date: entry ? format(new Date(entry.date), "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
     time: entry ? format(new Date(entry.date), "HH:mm") : format(new Date(), "HH:mm"),
     shift: (entry?.shift ?? "MORNING") as "MORNING" | "EVENING",
+    milkType: (entry?.milkType ?? "MIXED") as "BUFFALO" | "COW" | "MIXED",
     liters: entry?.liters.toString() ?? "",
     fatPercent: entry?.fatPercent.toString() ?? "",
   });
@@ -44,8 +46,8 @@ function MilkModal({ entry, farmers, onClose }: { entry?: MilkEntry; farmers: Fa
   const preview = useMemo(() => {
     const l = parseFloat(form.liters), f = parseFloat(form.fatPercent);
     if (isNaN(l) || isNaN(f) || l <= 0 || f < 0) return null;
-    return calcPreview(l, f, admin?.rateConfig);
-  }, [form.liters, form.fatPercent, admin?.rateConfig]);
+    return calcPreview(l, f, form.milkType, admin?.rateConfig);
+  }, [form.liters, form.fatPercent, form.milkType, admin?.rateConfig]);
 
   const mutation = useMutation({
     mutationFn: (d: any) => entry ? milkApi.update(entry.id, d) : milkApi.create(d),
@@ -88,9 +90,8 @@ function MilkModal({ entry, farmers, onClose }: { entry?: MilkEntry; farmers: Fa
             <div className="flex gap-2">
               {(["MORNING", "EVENING"] as const).map(s => (
                 <button type="button" key={s} onClick={() => setForm({ ...form, shift: s })}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                    form.shift === s ? (s === "MORNING" ? "bg-yellow-50 border-yellow-400 text-yellow-700" : "bg-indigo-50 border-indigo-400 text-indigo-700")
-                    : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}>
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border text-sm font-medium transition-colors ${form.shift === s ? (s === "MORNING" ? "bg-yellow-50 border-yellow-400 text-yellow-700" : "bg-indigo-50 border-indigo-400 text-indigo-700")
+                      : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}>
                   {s === "MORNING" ? <><Sun size={14} /> {t("morning")}</> : <><Moon size={14} /> {t("evening")}</>}
                 </button>
               ))}
@@ -131,6 +132,20 @@ function MilkModal({ entry, farmers, onClose }: { entry?: MilkEntry; farmers: Fa
               </div>
             </div>
           )}
+          {/* Buffalo / Cow toggle */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Milk Type *</label>
+            <div className="flex gap-2">
+              {([["BUFFALO", "🐃 Buffalo"], ["COW", "🐄 Cow"], ["MIXED", "🐃🐄 Mixed"]] as const).map(([val, label]) => (
+                <button type="button" key={val} onClick={() => setForm({ ...form, milkType: val })}
+                  className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${form.milkType === val ? "bg-brand-600 border-brand-600 text-white" : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                    }`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onClose} className="btn-secondary flex-1">{t("cancel")}</button>
             <button type="submit" disabled={mutation.isPending} className="btn-primary flex-1">
@@ -211,6 +226,9 @@ export default function MilkEntryPage() {
                       <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{entry.farmer.code}</span>
                       <span className={entry.shift === "MORNING" ? "badge-morning" : "badge-evening"}>
                         {entry.shift === "MORNING" ? `☀️ ${t("morning")}` : `🌙 ${t("evening")}`}
+                      </span>
+                      <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
+                        {entry.milkType === "BUFFALO" ? "🐃" : entry.milkType === "COW" ? "🐄" : "🐃🐄"}
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 mt-0.5">{format(new Date(entry.date), "dd MMM yyyy, hh:mm a")} · {entry.farmer.village}</p>

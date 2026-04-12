@@ -1,18 +1,18 @@
 import { useState } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, Droplets, BarChart3, CreditCard, LogOut, Menu, X, AlertCircle, Globe, KeyRound } from "lucide-react";
+import { LayoutDashboard, Users, Droplets, BarChart3, CreditCard, LogOut, Menu, X, AlertCircle, Globe, KeyRound, Settings } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { useLanguage } from "../../hooks/useLanguage";
 import { authApi } from "../../lib/api";
 import toast from "react-hot-toast";
 import type { Language } from "../../lib/i18n";
- 
+
 function ChangeMyPasswordModal({ onClose }: { onClose: () => void }) {
   const [current, setCurrent] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
- 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPw !== confirm) { toast.error("Passwords match nahi kar rahe!"); return; }
@@ -28,7 +28,7 @@ function ChangeMyPasswordModal({ onClose }: { onClose: () => void }) {
       setLoading(false);
     }
   };
- 
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
@@ -63,7 +63,7 @@ function ChangeMyPasswordModal({ onClose }: { onClose: () => void }) {
     </div>
   );
 }
- 
+
 export default function Layout() {
   const { admin, logout } = useAuth();
   const { lang, setLang, t } = useLanguage();
@@ -71,7 +71,7 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [showPwModal, setShowPwModal] = useState(false);
- 
+
   const navItems = [
     { to: "/dashboard", icon: LayoutDashboard, label: t("dashboard") },
     { to: "/farmers", icon: Users, label: t("farmers") },
@@ -79,22 +79,23 @@ export default function Layout() {
     { to: "/dues", icon: AlertCircle, label: t("dues") },
     { to: "/reports", icon: BarChart3, label: t("reports") },
     { to: "/payments", icon: CreditCard, label: t("payments") },
+    { to: "/rate-settings", icon: Settings, label: "Rate Settings" },
   ];
- 
+
   const handleLogout = () => { logout(); navigate("/login"); };
- 
+
   const handleLangChange = async (l: Language) => {
     setLang(l);
     setShowLangMenu(false);
-    try { await authApi.updateLanguage(l); } catch {}
+    try { await authApi.updateLanguage(l); } catch { }
   };
- 
+
   const langLabels: Record<Language, string> = {
     hindi: "हिन्दी",
     english: "English",
     hinglish: "Hinglish",
   };
- 
+
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-orange-100">
@@ -106,19 +107,18 @@ export default function Layout() {
           </div>
         </div>
       </div>
- 
+
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink key={to} to={to} onClick={() => setSidebarOpen(false)}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-orange-50 hover:text-brand-700"
+              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-orange-50 hover:text-brand-700"
               }`}>
             <Icon size={18} />{label}
           </NavLink>
         ))}
       </nav>
- 
+
       <div className="p-3 border-t border-orange-100 space-y-1">
         {/* Language switcher */}
         <div className="relative">
@@ -139,7 +139,7 @@ export default function Layout() {
             </div>
           )}
         </div>
- 
+
         <div className="flex items-center gap-2 px-3 py-2">
           <div className="w-8 h-8 bg-brand-100 rounded-full flex items-center justify-center text-brand-700 font-bold text-sm">
             {admin?.name?.[0]}
@@ -149,12 +149,12 @@ export default function Layout() {
             <p className="text-xs text-gray-500">Admin</p>
           </div>
         </div>
- 
+
         <button onClick={() => setShowPwModal(true)}
           className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
           <KeyRound size={15} /> Password Change
         </button>
- 
+
         <button onClick={handleLogout}
           className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors">
           <LogOut size={16} />{t("logout")}
@@ -162,7 +162,7 @@ export default function Layout() {
       </div>
     </div>
   );
- 
+
   return (
     <div className="flex h-screen bg-gray-50">
       <aside className="hidden md:flex w-56 bg-white border-r border-orange-100 flex-col flex-shrink-0">
@@ -191,4 +191,3 @@ export default function Layout() {
     </div>
   );
 }
- 

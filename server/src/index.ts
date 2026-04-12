@@ -15,6 +15,7 @@ import reportRoutes from "./routes/reports";
 import paymentRoutes from "./routes/payments";
 import notifyRoutes from "./routes/notify";
 import superAdminRoutes from "./routes/superadmin";
+import rateSettingsRoutes from "./routes/rateSettings";
 
 dotenv.config();
 
@@ -84,6 +85,7 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/notify", notifyRoutes);
 app.use("/api/superadmin", superAdminRoutes);
+app.use("/api/rate-settings", rateSettingsRoutes);
 
 // Health check
 app.get("/api/health", (_req, res) => {

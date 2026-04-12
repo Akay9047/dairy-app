@@ -17,6 +17,7 @@ import MilkEntryPage from "./pages/MilkEntryPage";
 import ReportsPage from "./pages/ReportsPage";
 import PaymentsPage from "./pages/PaymentsPage";
 import DuesPage from "./pages/DuesPage";
+import RateSettingsPage from "./pages/RateSettingsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30000 } },
@@ -66,6 +67,7 @@ function App() {
                 <Route path="reports" element={<ReportsPage />} />
                 <Route path="payments" element={<PaymentsPage />} />
                 <Route path="dues" element={<DuesPage />} />
+                <Route path="rate-settings" element={<RateSettingsPage />} />
               </Route>
             </Routes>
           </BrowserRouter>

@@ -11,37 +11,47 @@ async function getRateConfig(dairyId: string): Promise<RateConfig> {
   const config = await prisma.rateConfig.findUnique({ where: { dairyId } });
   if (!config) return DEFAULT_RATE_CONFIG;
   return {
+    rateType: (config.rateType as "fat" | "fixed") ?? "fat",
     fatRatePerKg: config.fatRatePerKg,
     snfRatePerKg: config.snfRatePerKg,
     minRatePerLiter: config.minRatePerLiter,
     useMinRate: config.useMinRate,
-    milkType: (config.milkType as "cow" | "buffalo" | "mixed") ?? "mixed",
+    buffaloFatRate: config.buffaloFatRate,
+    cowFatRate: config.cowFatRate,
+    buffaloSnfRate: config.buffaloSnfRate,
+    cowSnfRate: config.cowSnfRate,
+    buffaloFixedRate: config.buffaloFixedRate,
+    cowFixedRate: config.cowFixedRate,
   };
 }
 
 const MilkSchema = z.object({
   farmerId: z.string().uuid(),
-  date: z.string().datetime(),
+  date: z.string(),
   shift: z.enum(["MORNING", "EVENING"]).default("MORNING"),
-  liters: z.number().positive().max(1000, "Max 1000 liters per entry"),
+  milkType: z.enum(["BUFFALO", "COW", "MIXED"]).default("MIXED"),
+  liters: z.number().positive().max(1000),
   fatPercent: z.number().min(0.1).max(15),
 });
 
 router.get("/", async (req: AuthRequest, res: Response) => {
   try {
-    const { farmerId, from, to, shift, page = "1", limit = "50" } = req.query;
+    const { farmerId, from, to, shift, milkType, page = "1", limit = "50" } = req.query;
     const pageNum = Math.max(1, parseInt(String(page)));
     const limitNum = Math.min(100, Math.max(1, parseInt(String(limit))));
     const skip = (pageNum - 1) * limitNum;
 
-    const where = {
+    const where: any = {
       dairyId: req.dairyId!,
       ...(farmerId ? { farmerId: String(farmerId) } : {}),
-      ...(shift ? { shift: String(shift) as "MORNING" | "EVENING" } : {}),
-      ...(from || to ? { date: {
-        ...(from ? { gte: new Date(String(from)) } : {}),
-        ...(to ? { lte: new Date(String(to)) } : {}),
-      }} : {}),
+      ...(shift ? { shift: String(shift) } : {}),
+      ...(milkType ? { milkType: String(milkType) } : {}),
+      ...(from || to ? {
+        date: {
+          ...(from ? { gte: new Date(String(from)) } : {}),
+          ...(to ? { lte: new Date(String(to)) } : {}),
+        }
+      } : {}),
     };
 
     const [entries, total] = await Promise.all([
@@ -78,7 +88,7 @@ router.post("/", async (req: AuthRequest, res: Response) => {
     if (!farmer) return res.status(403).json({ error: "Yeh kisaan aapki dairy ka nahi hai" });
 
     const config = await getRateConfig(req.dairyId!);
-    const calc = calculateRates(data.liters, data.fatPercent, config);
+    const calc = calculateRates(data.liters, data.fatPercent, data.milkType, config);
 
     const entry = await prisma.milkEntry.create({
       data: {
@@ -86,6 +96,7 @@ router.post("/", async (req: AuthRequest, res: Response) => {
         dairyId: req.dairyId!,
         date: new Date(data.date),
         shift: data.shift,
+        milkType: data.milkType,
         liters: data.liters,
         fatPercent: data.fatPercent,
         snfPercent: calc.snfPercent,
@@ -115,8 +126,9 @@ router.put("/:id", async (req: AuthRequest, res: Response) => {
     const data = MilkSchema.partial().parse(req.body);
     const liters = data.liters ?? existing.liters;
     const fatPercent = data.fatPercent ?? existing.fatPercent;
+    const milkType = data.milkType ?? (existing.milkType as "BUFFALO" | "COW" | "MIXED");
     const config = await getRateConfig(req.dairyId!);
-    const calc = calculateRates(liters, fatPercent, config);
+    const calc = calculateRates(liters, fatPercent, milkType, config);
 
     const entry = await prisma.milkEntry.update({
       where: { id: req.params.id },
@@ -124,6 +136,7 @@ router.put("/:id", async (req: AuthRequest, res: Response) => {
         ...(data.farmerId ? { farmerId: data.farmerId } : {}),
         ...(data.date ? { date: new Date(data.date) } : {}),
         ...(data.shift ? { shift: data.shift } : {}),
+        milkType,
         liters, fatPercent,
         snfPercent: calc.snfPercent,
         fatKg: calc.fatKg, snfKg: calc.snfKg,
@@ -148,6 +161,17 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
     await prisma.milkEntry.delete({ where: { id: req.params.id } });
     res.json({ message: "Entry delete ho gayi" });
   } catch { res.status(500).json({ error: "Delete nahi hua" }); }
+});
+
+// Rate preview endpoint
+router.post("/preview-rate", async (req: AuthRequest, res: Response) => {
+  try {
+    const { liters, fatPercent, milkType = "MIXED" } = req.body;
+    if (!liters || !fatPercent) return res.status(400).json({ error: "liters aur fatPercent zaroori hai" });
+    const config = await getRateConfig(req.dairyId!);
+    const calc = calculateRates(Number(liters), Number(fatPercent), milkType, config);
+    res.json({ ...calc, rateType: config.rateType });
+  } catch { res.status(500).json({ error: "Rate calculate nahi hua" }); }
 });
 
 export default router;
