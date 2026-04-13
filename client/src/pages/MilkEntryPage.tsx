@@ -18,15 +18,21 @@ interface MilkEntry {
   farmer: Farmer;
 }
 
-function calcPreview(liters: number, fat: number, config: any) {
+function calcPreview(liters: number, fat: number, milkType: string = "MIXED", config: any) {
   const cfg = {
+    rateType: (config?.rateType ?? "fat") as "fat" | "fixed",
     fatRatePerKg: config?.fatRatePerKg ?? DEFAULT_CONFIG.fatRatePerKg,
     snfRatePerKg: config?.snfRatePerKg ?? DEFAULT_CONFIG.snfRatePerKg,
     minRatePerLiter: config?.minRatePerLiter ?? DEFAULT_CONFIG.minRatePerLiter,
     useMinRate: config?.useMinRate ?? true,
-    milkType: config?.milkType ?? "mixed",
+    buffaloFatRate: config?.buffaloFatRate ?? DEFAULT_CONFIG.buffaloFatRate,
+    cowFatRate: config?.cowFatRate ?? DEFAULT_CONFIG.cowFatRate,
+    buffaloSnfRate: config?.buffaloSnfRate ?? DEFAULT_CONFIG.buffaloSnfRate,
+    cowSnfRate: config?.cowSnfRate ?? DEFAULT_CONFIG.cowSnfRate,
+    buffaloFixedRate: config?.buffaloFixedRate ?? DEFAULT_CONFIG.buffaloFixedRate,
+    cowFixedRate: config?.cowFixedRate ?? DEFAULT_CONFIG.cowFixedRate,
   };
-  return calcRates(liters, fat, cfg);
+  return calcRates(liters, fat, milkType, cfg);
 }
 
 function MilkModal({ entry, farmers, onClose }: { entry?: MilkEntry; farmers: Farmer[]; onClose: () => void }) {

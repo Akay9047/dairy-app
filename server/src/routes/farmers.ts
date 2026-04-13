@@ -72,7 +72,8 @@ router.put("/:id", async (req: AuthRequest, res: Response) => {
   try {
     const existing = await prisma.farmer.findFirst({ where: { id: req.params.id, dairyId: req.dairyId! } });
     if (!existing) return res.status(404).json({ error: "Farmer nahi mila" });
-    const data = FarmerSchema.partial().parse(req.body);
+    const rawData = FarmerSchema.partial().parse(req.body);
+    const { ...data } = rawData;
     const farmer = await prisma.farmer.update({ where: { id: req.params.id }, data });
     res.json(farmer);
   } catch (err) {
