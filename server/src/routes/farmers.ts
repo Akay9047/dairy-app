@@ -60,7 +60,16 @@ router.post("/", async (req: AuthRequest, res: Response) => {
       },
     });
     if (existing) return res.status(400).json({ error: "Is mobile ya code se farmer pehle se hai" });
-    const farmer = await prisma.farmer.create({ data: { ...data, dairyId: req.dairyId! } });
+
+    const farmer = await prisma.farmer.create({
+      data: {
+        name: data.name,
+        mobile: data.mobile,
+        code: data.code,
+        village: data.village,
+        dairyId: req.dairyId!,
+      },
+    });
     res.status(201).json(farmer);
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors[0].message });
@@ -70,11 +79,21 @@ router.post("/", async (req: AuthRequest, res: Response) => {
 
 router.put("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const existing = await prisma.farmer.findFirst({ where: { id: req.params.id, dairyId: req.dairyId! } });
+    const existing = await prisma.farmer.findFirst({
+      where: { id: req.params.id, dairyId: req.dairyId! },
+    });
     if (!existing) return res.status(404).json({ error: "Farmer nahi mila" });
-    const rawData = FarmerSchema.partial().parse(req.body);
-    const { ...data } = rawData;
-    const farmer = await prisma.farmer.update({ where: { id: req.params.id }, data });
+
+    const data = FarmerSchema.partial().parse(req.body);
+    const farmer = await prisma.farmer.update({
+      where: { id: req.params.id },
+      data: {
+        ...(data.name ? { name: data.name } : {}),
+        ...(data.mobile ? { mobile: data.mobile } : {}),
+        ...(data.code ? { code: data.code } : {}),
+        ...(data.village ? { village: data.village } : {}),
+      },
+    });
     res.json(farmer);
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors[0].message });
@@ -84,7 +103,9 @@ router.put("/:id", async (req: AuthRequest, res: Response) => {
 
 router.delete("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const existing = await prisma.farmer.findFirst({ where: { id: req.params.id, dairyId: req.dairyId! } });
+    const existing = await prisma.farmer.findFirst({
+      where: { id: req.params.id, dairyId: req.dairyId! },
+    });
     if (!existing) return res.status(404).json({ error: "Farmer nahi mila" });
     await prisma.farmer.update({ where: { id: req.params.id }, data: { isActive: false } });
     res.json({ message: "Farmer delete ho gaya" });
