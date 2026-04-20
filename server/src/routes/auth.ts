@@ -187,7 +187,7 @@ router.post("/setup", setupLimiter, async (req: Request, res: Response) => {
     await prisma.dairy.create({
       data: {
         name: dairyName, ownerName, mobile, superAdminId: sa.id, isActive: true,
-        rateConfig: { create: { rateType: 'fat', fatRatePerKg: 800, snfRatePerKg: 533, minRatePerLiter: 40, useMinRate: true, buffaloFatRate: 800, cowFatRate: 600, buffaloSnfRate: 533, cowSnfRate: 400, buffaloFixedRate: 60, cowFixedRate: 40 } },
+        rateConfig: { create: { pricingMode: 'fat_only', fatRate: 0.33, snfRate: 0.07, buffaloFixedRate: 60, cowFixedRate: 40, minRatePerLiter: 25, useMinRate: false, autoCalcSnf: true } },
         admins: { create: { username: adminUsername, password: adminHash, name: ownerName, language: "hinglish" } },
       },
     });
