@@ -1,5 +1,6 @@
 export interface RateConfig {
   rateType: "fat" | "fixed";
+  useSnf: boolean;
   fatRatePerKg: number; snfRatePerKg: number;
   minRatePerLiter: number; useMinRate: boolean;
   buffaloFatRate: number; cowFatRate: number;
@@ -8,7 +9,7 @@ export interface RateConfig {
 }
 
 export const DEFAULT_CONFIG: RateConfig = {
-  rateType: "fat",
+  rateType: "fat", useSnf: false,
   fatRatePerKg: 800, snfRatePerKg: 533,
   minRatePerLiter: 40, useMinRate: true,
   buffaloFatRate: 800, cowFatRate: 600,
@@ -26,13 +27,15 @@ export function estimateSNF(fat: number, milkType: string): number {
 
 export function calcRates(liters: number, fat: number, milkType: string, config: RateConfig) {
   const snfPercent = estimateSNF(fat, milkType);
+  const fatKg = (fat / 100) * liters;
+  const snfKg = (snfPercent / 100) * liters;
 
   if (config.rateType === "fixed") {
     const ratePerLiter = milkType === "BUFFALO" ? config.buffaloFixedRate
       : milkType === "COW" ? config.cowFixedRate
         : (config.buffaloFixedRate + config.cowFixedRate) / 2;
     return {
-      snfPercent, fatKg: 0, snfKg: 0, fatAmount: 0, snfAmount: 0,
+      snfPercent, fatKg, snfKg, fatAmount: 0, snfAmount: 0,
       ratePerLiter: parseFloat(ratePerLiter.toFixed(2)),
       totalAmount: parseFloat((liters * ratePerLiter).toFixed(2)),
     };
@@ -43,11 +46,21 @@ export function calcRates(liters: number, fat: number, milkType: string, config:
   const snfRate = milkType === "BUFFALO" ? config.buffaloSnfRate
     : milkType === "COW" ? config.cowSnfRate : config.snfRatePerKg;
 
-  const fatKg = parseFloat(((fat / 100) * liters).toFixed(4));
-  const snfKg = parseFloat(((snfPercent / 100) * liters).toFixed(4));
-  const fatAmount = parseFloat((fatKg * fatRate).toFixed(2));
-  const snfAmount = parseFloat((snfKg * snfRate).toFixed(2));
-  let ratePerLiter = parseFloat(((fatAmount + snfAmount) / liters).toFixed(2));
-  if (config.useMinRate && ratePerLiter < config.minRatePerLiter) ratePerLiter = config.minRatePerLiter;
-  return { snfPercent, fatKg, snfKg, fatAmount, snfAmount, ratePerLiter, totalAmount: parseFloat((ratePerLiter * liters).toFixed(2)) };
+  const fatAmount = fatKg * fatRate;
+  const snfAmount = config.useSnf ? snfKg * snfRate : 0;
+  let ratePerLiter = (fatAmount + snfAmount) / liters;
+
+  if (config.useMinRate && ratePerLiter < config.minRatePerLiter) {
+    ratePerLiter = config.minRatePerLiter;
+  }
+
+  return {
+    snfPercent,
+    fatKg: parseFloat(fatKg.toFixed(4)),
+    snfKg: parseFloat(snfKg.toFixed(4)),
+    fatAmount: parseFloat(fatAmount.toFixed(2)),
+    snfAmount: parseFloat(snfAmount.toFixed(2)),
+    ratePerLiter: parseFloat(ratePerLiter.toFixed(2)),
+    totalAmount: parseFloat((ratePerLiter * liters).toFixed(2)),
+  };
 }

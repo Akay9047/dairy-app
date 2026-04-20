@@ -1,12 +1,14 @@
 /**
- * Rajasthan Dairy Rate Calculator
- * Supports: Fat-based (SNF auto) + Fixed rate
- * Buffalo / Cow alag alag rates
+ * Smart Dairy Solution - Rate Calculator
+ * Supports:
+ * 1. Fat Only (SNF band) - sirf fat se rate
+ * 2. Fat + SNF (dono se rate)
+ * 3. Fixed rate (flat per liter)
  */
 
 export interface RateConfig {
   rateType: "fat" | "fixed";
-  // Fat-based
+  useSnf: boolean;          // SNF on/off
   fatRatePerKg: number;
   snfRatePerKg: number;
   minRatePerLiter: number;
@@ -15,13 +17,13 @@ export interface RateConfig {
   cowFatRate: number;
   buffaloSnfRate: number;
   cowSnfRate: number;
-  // Fixed
   buffaloFixedRate: number;
   cowFixedRate: number;
 }
 
 export const DEFAULT_RATE_CONFIG: RateConfig = {
   rateType: "fat",
+  useSnf: false,            // Default: sirf fat se rate (simple)
   fatRatePerKg: 800,
   snfRatePerKg: 533,
   minRatePerLiter: 40,
@@ -57,27 +59,25 @@ export function calculateRates(
   totalAmount: number;
 } {
   const snfPercent = estimateSNF(fatPercent, milkType);
+  const fatKg = parseFloat(((fatPercent / 100) * liters).toFixed(4));
+  const snfKg = parseFloat(((snfPercent / 100) * liters).toFixed(4));
 
+  // Fixed rate — fat/snf se koi fark nahi
   if (config.rateType === "fixed") {
-    // Fixed rate — simple calculation
     const ratePerLiter = milkType === "BUFFALO"
       ? config.buffaloFixedRate
       : milkType === "COW"
         ? config.cowFixedRate
         : (config.buffaloFixedRate + config.cowFixedRate) / 2;
-
-    const totalAmount = parseFloat((liters * ratePerLiter).toFixed(2));
-    const fatKg = parseFloat(((fatPercent / 100) * liters).toFixed(4));
-    const snfKg = parseFloat(((snfPercent / 100) * liters).toFixed(4));
-
     return {
       snfPercent, fatKg, snfKg,
       fatAmount: 0, snfAmount: 0,
-      ratePerLiter, totalAmount,
+      ratePerLiter: parseFloat(ratePerLiter.toFixed(2)),
+      totalAmount: parseFloat((liters * ratePerLiter).toFixed(2)),
     };
   }
 
-  // Fat-based calculation
+  // Fat-based: get rates per milk type
   const fatRate = milkType === "BUFFALO" ? config.buffaloFatRate
     : milkType === "COW" ? config.cowFatRate
       : config.fatRatePerKg;
@@ -86,12 +86,21 @@ export function calculateRates(
     : milkType === "COW" ? config.cowSnfRate
       : config.snfRatePerKg;
 
-  const fatKg = parseFloat(((fatPercent / 100) * liters).toFixed(4));
-  const snfKg = parseFloat(((snfPercent / 100) * liters).toFixed(4));
   const fatAmount = parseFloat((fatKg * fatRate).toFixed(2));
-  const snfAmount = parseFloat((snfKg * snfRate).toFixed(2));
-  let ratePerLiter = parseFloat(((fatAmount + snfAmount) / liters).toFixed(2));
 
+  let snfAmount = 0;
+  let ratePerLiter: number;
+
+  if (config.useSnf) {
+    // Fat + SNF dono se rate
+    snfAmount = parseFloat((snfKg * snfRate).toFixed(2));
+    ratePerLiter = parseFloat(((fatAmount + snfAmount) / liters).toFixed(2));
+  } else {
+    // Sirf Fat se rate (SNF band) — yeh simple aur common hai
+    ratePerLiter = parseFloat((fatAmount / liters).toFixed(2));
+  }
+
+  // Min rate guarantee
   if (config.useMinRate && ratePerLiter < config.minRatePerLiter) {
     ratePerLiter = config.minRatePerLiter;
   }

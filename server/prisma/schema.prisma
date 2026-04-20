@@ -58,6 +58,7 @@ model RateConfig {
   dairyId          String   @unique
   dairy            Dairy    @relation(fields: [dairyId], references: [id])
   rateType         String   @default("fat")
+  useSnf           Boolean  @default(false)
   fatRatePerKg     Float    @default(800.0)
   snfRatePerKg     Float    @default(533.0)
   minRatePerLiter  Float    @default(40.0)
@@ -96,7 +97,7 @@ model MilkEntry {
   farmerId     String
   farmer       Farmer    @relation(fields: [farmerId], references: [id], onDelete: Cascade)
   dairyId      String
-  dairy        Dairy     @relation(fields: [dairyId], references: [id])
+  dairy         Dairy    @relation(fields: [dairyId], references: [id])
   date         DateTime
   shift        Shift     @default(MORNING)
   milkType     MilkType  @default(MIXED)
@@ -115,7 +116,6 @@ model MilkEntry {
   @@index([dairyId, date(sort: Desc)])
   @@index([farmerId, date(sort: Desc)])
   @@index([dairyId, farmerId])
-  @@index([date])
 }
 
 model Payment {

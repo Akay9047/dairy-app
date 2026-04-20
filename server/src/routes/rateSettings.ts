@@ -15,18 +15,38 @@ router.get("/", async (req: AuthRequest, res: Response) => {
 router.put("/", async (req: AuthRequest, res: Response) => {
     try {
         const {
-            rateType, fatRatePerKg, snfRatePerKg, minRatePerLiter, useMinRate,
+            rateType, useSnf, fatRatePerKg, snfRatePerKg,
+            minRatePerLiter, useMinRate,
             buffaloFatRate, cowFatRate, buffaloSnfRate, cowSnfRate,
             buffaloFixedRate, cowFixedRate,
         } = req.body;
 
         const config = await prisma.rateConfig.upsert({
             where: { dairyId: req.dairyId! },
-            update: { rateType, fatRatePerKg, snfRatePerKg, minRatePerLiter, useMinRate, buffaloFatRate, cowFatRate, buffaloSnfRate, cowSnfRate, buffaloFixedRate, cowFixedRate },
-            create: { dairyId: req.dairyId!, rateType, fatRatePerKg, snfRatePerKg, minRatePerLiter, useMinRate: useMinRate ?? true, buffaloFatRate, cowFatRate, buffaloSnfRate, cowSnfRate, buffaloFixedRate, cowFixedRate },
+            update: {
+                rateType, useSnf: useSnf ?? false,
+                fatRatePerKg, snfRatePerKg, minRatePerLiter,
+                useMinRate: useMinRate ?? true,
+                buffaloFatRate, cowFatRate, buffaloSnfRate, cowSnfRate,
+                buffaloFixedRate, cowFixedRate,
+            },
+            create: {
+                dairyId: req.dairyId!,
+                rateType: rateType ?? "fat", useSnf: useSnf ?? false,
+                fatRatePerKg: fatRatePerKg ?? 800,
+                snfRatePerKg: snfRatePerKg ?? 533,
+                minRatePerLiter: minRatePerLiter ?? 40,
+                useMinRate: useMinRate ?? true,
+                buffaloFatRate: buffaloFatRate ?? 800,
+                cowFatRate: cowFatRate ?? 600,
+                buffaloSnfRate: buffaloSnfRate ?? 533,
+                cowSnfRate: cowSnfRate ?? 400,
+                buffaloFixedRate: buffaloFixedRate ?? 60,
+                cowFixedRate: cowFixedRate ?? 40,
+            },
         });
         res.json(config);
-    } catch { res.status(500).json({ error: "Rate update nahi hua" }); }
+    } catch (err: any) { res.status(500).json({ error: "Rate update nahi hua" }); }
 });
 
 export default router;
