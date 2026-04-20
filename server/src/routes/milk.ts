@@ -2,42 +2,23 @@ import { Router, Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { authMiddleware, adminOnly, AuthRequest } from "../middleware/auth";
-import { calculateRates, RateConfig } from "../lib/rateCalc";
+import { calculateRates, DEFAULT_RATE_CONFIG, RateConfig } from "../lib/rateCalc";
 
 const router = Router();
 router.use(authMiddleware, adminOnly);
-
-const DEFAULT_RATE_CONFIG: RateConfig = {
-  rateType: "fat",
-  useSnf: false,
-  fatRatePerKg: 800,
-  snfRatePerKg: 533,
-  minRatePerLiter: 40,
-  useMinRate: true,
-  buffaloFatRate: 800,
-  cowFatRate: 600,
-  buffaloSnfRate: 533,
-  cowSnfRate: 400,
-  buffaloFixedRate: 60,
-  cowFixedRate: 40,
-};
 
 async function getRateConfig(dairyId: string): Promise<RateConfig> {
   const config = await prisma.rateConfig.findUnique({ where: { dairyId } });
   if (!config) return DEFAULT_RATE_CONFIG;
   return {
-    rateType: (config.rateType as "fat" | "fixed") ?? "fat",
-    useSnf: (config as any).useSnf ?? false,
-    fatRatePerKg: config.fatRatePerKg,
-    snfRatePerKg: config.snfRatePerKg,
-    minRatePerLiter: config.minRatePerLiter,
-    useMinRate: config.useMinRate,
-    buffaloFatRate: config.buffaloFatRate,
-    cowFatRate: config.cowFatRate,
-    buffaloSnfRate: config.buffaloSnfRate,
-    cowSnfRate: config.cowSnfRate,
+    pricingMode: (config as any).pricingMode ?? "fat_only",
+    fatRate: (config as any).fatRate ?? 0.33,
+    snfRate: (config as any).snfRate ?? 0.07,
     buffaloFixedRate: config.buffaloFixedRate,
     cowFixedRate: config.cowFixedRate,
+    minRatePerLiter: config.minRatePerLiter,
+    useMinRate: config.useMinRate,
+    autoCalcSnf: (config as any).autoCalcSnf ?? true,
   };
 }
 
@@ -48,6 +29,8 @@ const MilkSchema = z.object({
   milkType: z.enum(["BUFFALO", "COW", "MIXED"]).default("MIXED"),
   liters: z.number().positive().max(1000),
   fatPercent: z.number().min(0.1).max(15),
+  snfPercent: z.number().min(0).max(15).optional(),
+  clr: z.number().min(0).max(40).optional(),
 });
 
 router.get("/", async (req: AuthRequest, res: Response) => {
@@ -55,7 +38,6 @@ router.get("/", async (req: AuthRequest, res: Response) => {
     const { farmerId, from, to, shift, milkType, page = "1", limit = "50" } = req.query;
     const pageNum = Math.max(1, parseInt(String(page)));
     const limitNum = Math.min(100, Math.max(1, parseInt(String(limit))));
-    const skip = (pageNum - 1) * limitNum;
 
     const where: any = {
       dairyId: req.dairyId!,
@@ -72,7 +54,7 @@ router.get("/", async (req: AuthRequest, res: Response) => {
 
     const [entries, total] = await Promise.all([
       prisma.milkEntry.findMany({
-        where, skip, take: limitNum,
+        where, skip: (pageNum - 1) * limitNum, take: limitNum,
         include: { farmer: { select: { name: true, code: true, mobile: true, village: true } } },
         orderBy: { date: "desc" },
       }),
@@ -103,7 +85,7 @@ router.post("/", async (req: AuthRequest, res: Response) => {
     if (!farmer) return res.status(403).json({ error: "Yeh kisaan aapki dairy ka nahi hai" });
 
     const config = await getRateConfig(req.dairyId!);
-    const calc = calculateRates(data.liters, data.fatPercent, data.milkType, config);
+    const calc = calculateRates(data.liters, data.fatPercent, data.milkType, config, data.snfPercent, data.clr);
 
     const entry = await prisma.milkEntry.create({
       data: {
@@ -115,18 +97,21 @@ router.post("/", async (req: AuthRequest, res: Response) => {
         liters: data.liters,
         fatPercent: data.fatPercent,
         snfPercent: calc.snfPercent,
+        clr: data.clr,
         fatKg: calc.fatKg,
         snfKg: calc.snfKg,
         fatAmount: calc.fatAmount,
         snfAmount: calc.snfAmount,
         ratePerLiter: calc.ratePerLiter,
         totalAmount: calc.totalAmount,
+        formula: calc.formula,
       },
       include: { farmer: true },
     });
     res.status(201).json(entry);
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors[0].message });
+    console.error(err);
     res.status(500).json({ error: "Entry save nahi hui" });
   }
 });
@@ -143,7 +128,7 @@ router.put("/:id", async (req: AuthRequest, res: Response) => {
     const fatPercent = data.fatPercent ?? existing.fatPercent;
     const milkType = data.milkType ?? (existing.milkType as "BUFFALO" | "COW" | "MIXED");
     const config = await getRateConfig(req.dairyId!);
-    const calc = calculateRates(liters, fatPercent, milkType, config);
+    const calc = calculateRates(liters, fatPercent, milkType, config, data.snfPercent, data.clr);
 
     const entry = await prisma.milkEntry.update({
       where: { id: req.params.id },
@@ -153,9 +138,11 @@ router.put("/:id", async (req: AuthRequest, res: Response) => {
         ...(data.shift ? { shift: data.shift } : {}),
         milkType, liters, fatPercent,
         snfPercent: calc.snfPercent,
+        ...(data.clr !== undefined ? { clr: data.clr } : {}),
         fatKg: calc.fatKg, snfKg: calc.snfKg,
         fatAmount: calc.fatAmount, snfAmount: calc.snfAmount,
         ratePerLiter: calc.ratePerLiter, totalAmount: calc.totalAmount,
+        formula: calc.formula,
       },
       include: { farmer: true },
     });
@@ -177,13 +164,14 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
   } catch { res.status(500).json({ error: "Delete nahi hua" }); }
 });
 
+// Preview rate without saving
 router.post("/preview-rate", async (req: AuthRequest, res: Response) => {
   try {
-    const { liters, fatPercent, milkType = "MIXED" } = req.body;
+    const { liters, fatPercent, milkType = "BUFFALO", snfPercent, clr } = req.body;
     if (!liters || !fatPercent) return res.status(400).json({ error: "liters aur fatPercent zaroori hai" });
     const config = await getRateConfig(req.dairyId!);
-    const calc = calculateRates(Number(liters), Number(fatPercent), milkType, config);
-    res.json({ ...calc, rateType: config.rateType, useSnf: config.useSnf });
+    const calc = calculateRates(Number(liters), Number(fatPercent), milkType, config, snfPercent, clr);
+    res.json({ ...calc, pricingMode: config.pricingMode });
   } catch { res.status(500).json({ error: "Rate calculate nahi hua" }); }
 });
 

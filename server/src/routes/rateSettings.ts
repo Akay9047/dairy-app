@@ -15,38 +15,37 @@ router.get("/", async (req: AuthRequest, res: Response) => {
 router.put("/", async (req: AuthRequest, res: Response) => {
     try {
         const {
-            rateType, useSnf, fatRatePerKg, snfRatePerKg,
-            minRatePerLiter, useMinRate,
-            buffaloFatRate, cowFatRate, buffaloSnfRate, cowSnfRate,
+            pricingMode, fatRate, snfRate,
             buffaloFixedRate, cowFixedRate,
+            minRatePerLiter, useMinRate, autoCalcSnf,
         } = req.body;
 
         const config = await prisma.rateConfig.upsert({
             where: { dairyId: req.dairyId! },
             update: {
-                rateType, useSnf: useSnf ?? false,
-                fatRatePerKg, snfRatePerKg, minRatePerLiter,
-                useMinRate: useMinRate ?? true,
-                buffaloFatRate, cowFatRate, buffaloSnfRate, cowSnfRate,
-                buffaloFixedRate, cowFixedRate,
+                pricingMode: pricingMode ?? "fat_only",
+                fatRate: fatRate ?? 0.33,
+                snfRate: snfRate ?? 0.07,
+                buffaloFixedRate: buffaloFixedRate ?? 60,
+                cowFixedRate: cowFixedRate ?? 40,
+                minRatePerLiter: minRatePerLiter ?? 25,
+                useMinRate: useMinRate ?? false,
+                autoCalcSnf: autoCalcSnf ?? true,
             },
             create: {
                 dairyId: req.dairyId!,
-                rateType: rateType ?? "fat", useSnf: useSnf ?? false,
-                fatRatePerKg: fatRatePerKg ?? 800,
-                snfRatePerKg: snfRatePerKg ?? 533,
-                minRatePerLiter: minRatePerLiter ?? 40,
-                useMinRate: useMinRate ?? true,
-                buffaloFatRate: buffaloFatRate ?? 800,
-                cowFatRate: cowFatRate ?? 600,
-                buffaloSnfRate: buffaloSnfRate ?? 533,
-                cowSnfRate: cowSnfRate ?? 400,
+                pricingMode: pricingMode ?? "fat_only",
+                fatRate: fatRate ?? 0.33,
+                snfRate: snfRate ?? 0.07,
                 buffaloFixedRate: buffaloFixedRate ?? 60,
                 cowFixedRate: cowFixedRate ?? 40,
+                minRatePerLiter: minRatePerLiter ?? 25,
+                useMinRate: useMinRate ?? false,
+                autoCalcSnf: autoCalcSnf ?? true,
             },
         });
         res.json(config);
-    } catch (err: any) { res.status(500).json({ error: "Rate update nahi hua" }); }
+    } catch (err: any) { res.status(500).json({ error: "Rate update nahi hua: " + err.message }); }
 });
 
 export default router;

@@ -57,18 +57,14 @@ model RateConfig {
   id               String   @id @default(uuid())
   dairyId          String   @unique
   dairy            Dairy    @relation(fields: [dairyId], references: [id])
-  rateType         String   @default("fat")
-  useSnf           Boolean  @default(false)
-  fatRatePerKg     Float    @default(800.0)
-  snfRatePerKg     Float    @default(533.0)
-  minRatePerLiter  Float    @default(40.0)
-  useMinRate       Boolean  @default(true)
+  pricingMode      String   @default("fat_only")
+  fatRate          Float    @default(0.33)
+  snfRate          Float    @default(0.07)
   buffaloFixedRate Float    @default(60.0)
   cowFixedRate     Float    @default(40.0)
-  buffaloFatRate   Float    @default(800.0)
-  cowFatRate       Float    @default(600.0)
-  buffaloSnfRate   Float    @default(533.0)
-  cowSnfRate       Float    @default(400.0)
+  minRatePerLiter  Float    @default(25.0)
+  useMinRate       Boolean  @default(false)
+  autoCalcSnf      Boolean  @default(true)
   updatedAt        DateTime @updatedAt @default(now())
 }
 
@@ -97,19 +93,21 @@ model MilkEntry {
   farmerId     String
   farmer       Farmer    @relation(fields: [farmerId], references: [id], onDelete: Cascade)
   dairyId      String
-  dairy         Dairy    @relation(fields: [dairyId], references: [id])
+  dairy        Dairy     @relation(fields: [dairyId], references: [id])
   date         DateTime
   shift        Shift     @default(MORNING)
   milkType     MilkType  @default(MIXED)
   liters       Float
   fatPercent   Float
-  snfPercent   Float
+  snfPercent   Float     @default(0)
+  clr          Float?
   fatKg        Float     @default(0)
   snfKg        Float     @default(0)
   fatAmount    Float     @default(0)
   snfAmount    Float     @default(0)
   ratePerLiter Float
   totalAmount  Float
+  formula      String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
