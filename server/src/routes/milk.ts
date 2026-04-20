@@ -2,16 +2,32 @@ import { Router, Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { authMiddleware, adminOnly, AuthRequest } from "../middleware/auth";
-import { calculateRates, DEFAULT_RATE_CONFIG, RateConfig } from "../lib/rateCalc";
+import { calculateRates, RateConfig } from "../lib/rateCalc";
 
 const router = Router();
 router.use(authMiddleware, adminOnly);
+
+const DEFAULT_RATE_CONFIG: RateConfig = {
+  rateType: "fat",
+  useSnf: false,
+  fatRatePerKg: 800,
+  snfRatePerKg: 533,
+  minRatePerLiter: 40,
+  useMinRate: true,
+  buffaloFatRate: 800,
+  cowFatRate: 600,
+  buffaloSnfRate: 533,
+  cowSnfRate: 400,
+  buffaloFixedRate: 60,
+  cowFixedRate: 40,
+};
 
 async function getRateConfig(dairyId: string): Promise<RateConfig> {
   const config = await prisma.rateConfig.findUnique({ where: { dairyId } });
   if (!config) return DEFAULT_RATE_CONFIG;
   return {
     rateType: (config.rateType as "fat" | "fixed") ?? "fat",
+    useSnf: (config as any).useSnf ?? false,
     fatRatePerKg: config.fatRatePerKg,
     snfRatePerKg: config.snfRatePerKg,
     minRatePerLiter: config.minRatePerLiter,
@@ -81,7 +97,6 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
 router.post("/", async (req: AuthRequest, res: Response) => {
   try {
     const data = MilkSchema.parse(req.body);
-
     const farmer = await prisma.farmer.findFirst({
       where: { id: data.farmerId, dairyId: req.dairyId!, isActive: true },
     });
@@ -136,8 +151,7 @@ router.put("/:id", async (req: AuthRequest, res: Response) => {
         ...(data.farmerId ? { farmerId: data.farmerId } : {}),
         ...(data.date ? { date: new Date(data.date) } : {}),
         ...(data.shift ? { shift: data.shift } : {}),
-        milkType,
-        liters, fatPercent,
+        milkType, liters, fatPercent,
         snfPercent: calc.snfPercent,
         fatKg: calc.fatKg, snfKg: calc.snfKg,
         fatAmount: calc.fatAmount, snfAmount: calc.snfAmount,
@@ -163,14 +177,13 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
   } catch { res.status(500).json({ error: "Delete nahi hua" }); }
 });
 
-// Rate preview endpoint
 router.post("/preview-rate", async (req: AuthRequest, res: Response) => {
   try {
     const { liters, fatPercent, milkType = "MIXED" } = req.body;
     if (!liters || !fatPercent) return res.status(400).json({ error: "liters aur fatPercent zaroori hai" });
     const config = await getRateConfig(req.dairyId!);
     const calc = calculateRates(Number(liters), Number(fatPercent), milkType, config);
-    res.json({ ...calc, rateType: config.rateType });
+    res.json({ ...calc, rateType: config.rateType, useSnf: config.useSnf });
   } catch { res.status(500).json({ error: "Rate calculate nahi hua" }); }
 });
 
