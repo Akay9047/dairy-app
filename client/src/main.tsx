@@ -18,6 +18,7 @@ import ReportsPage from "./pages/ReportsPage";
 import PaymentsPage from "./pages/PaymentsPage";
 import DuesPage from "./pages/DuesPage";
 import RateSettingsPage from "./pages/RateSettingsPage";
+import FarmerReportPage from "./pages/FarmerReportPage";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30000 } },
@@ -36,11 +37,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function SuperAdminRoute({ children }: { children: React.ReactNode }) {
   const { admin, isLoading } = useAuth();
-  if (isLoading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-4xl">🐄</div>
-    </div>
-  );
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center"><div className="text-4xl">🐄</div></div>;
   if (!admin || admin.role !== "superadmin") return <Navigate to="/super/login" replace />;
   return <>{children}</>;
 }
@@ -54,12 +51,8 @@ function App() {
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/super/login" element={<SuperAdminLoginPage />} />
-              <Route path="/super/dashboard" element={
-                <SuperAdminRoute><SuperAdminPage /></SuperAdminRoute>
-              } />
-              <Route path="/" element={
-                <ProtectedRoute><Layout /></ProtectedRoute>
-              }>
+              <Route path="/super/dashboard" element={<SuperAdminRoute><SuperAdminPage /></SuperAdminRoute>} />
+              <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
                 <Route index element={<Navigate to="/dashboard" replace />} />
                 <Route path="dashboard" element={<DashboardPage />} />
                 <Route path="farmers" element={<FarmersPage />} />
@@ -68,10 +61,11 @@ function App() {
                 <Route path="payments" element={<PaymentsPage />} />
                 <Route path="dues" element={<DuesPage />} />
                 <Route path="rate-settings" element={<RateSettingsPage />} />
+                <Route path="farmer-report" element={<FarmerReportPage />} />
               </Route>
             </Routes>
           </BrowserRouter>
-          <Toaster position="top-right" />
+          <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
         </LanguageProvider>
       </AuthProvider>
     </QueryClientProvider>
@@ -82,11 +76,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode><App /></React.StrictMode>
 );
 
-// Register Service Worker for PWA
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js")
-      .then(() => console.log("SW registered"))
-      .catch((err) => console.log("SW error:", err));
+    navigator.serviceWorker.register("/sw.js").catch(() => { });
   });
 }
