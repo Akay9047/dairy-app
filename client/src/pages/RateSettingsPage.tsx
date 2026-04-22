@@ -8,8 +8,8 @@ import { Save } from "lucide-react";
 export default function RateSettingsPage() {
     const qc = useQueryClient();
     const [form, setForm] = useState<RateConfig>(DEFAULT_CONFIG);
-    const [previewFat, setPreviewFat] = useState(6.0);
-    const [previewLiters, setPreviewLiters] = useState(10);
+    const [fat, setFat] = useState(6.0);
+    const [liters, setLiters] = useState(10);
 
     const { data: config, isLoading } = useQuery({
         queryKey: ["rate-settings"],
@@ -21,7 +21,7 @@ export default function RateSettingsPage() {
     }, [config]);
 
     const mutation = useMutation({
-        mutationFn: (data: RateConfig) => rateSettingsApi.update(data),
+        mutationFn: (d: RateConfig) => rateSettingsApi.update(d),
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ["rate-settings"] });
             qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
@@ -32,56 +32,36 @@ export default function RateSettingsPage() {
 
     const f = (key: keyof RateConfig, val: any) => setForm(p => ({ ...p, [key]: val }));
 
-    const bufCalc = calcRates(previewLiters, previewFat, "BUFFALO", form);
-    const cowCalc = calcRates(previewLiters, previewFat, "COW", form);
+    const bufCalc = calcRates(liters, fat, "BUFFALO", form);
+    const cowCalc = calcRates(liters, fat, "COW", form);
 
-    if (isLoading) return <div className="p-6 text-center text-gray-500">Loading...</div>;
+    if (isLoading) return <div className="p-6 text-center text-gray-400">Loading...</div>;
 
     return (
         <div className="p-4 md:p-6 space-y-4 max-w-2xl">
             <div>
                 <h1 className="text-xl font-bold text-gray-900">Rate Settings</h1>
-                <p className="text-sm text-gray-500">Doodh ka rate system set karein</p>
+                <p className="text-sm text-gray-500">Doodh pricing system configure karein</p>
             </div>
 
-            {/* Mode Selection */}
+            {/* === MODE SELECT === */}
             <div className="card">
-                <h2 className="font-semibold text-gray-800 mb-3">Pricing Mode Chunein</h2>
+                <p className="text-sm font-semibold text-gray-700 mb-3">Pricing Mode</p>
                 <div className="space-y-2">
                     {[
-                        {
-                            val: "fat_only",
-                            icon: "📊",
-                            label: "Fat Only",
-                            desc: "Rate = Fat% × Fat Rate (sabse common, simple)",
-                            example: "Fat 6% × ₹0.33 = ₹1.98/L"
-                        },
-                        {
-                            val: "fat_snf",
-                            icon: "🧪",
-                            label: "Fat + SNF",
-                            desc: "Rate = (Fat% × Fat Rate) + (SNF% × SNF Rate)",
-                            example: "Fat 6%×₹0.33 + SNF 9%×₹0.07 = ₹1.98+₹0.63 = ₹2.61/L"
-                        },
-                        {
-                            val: "fixed",
-                            icon: "💰",
-                            label: "Fixed Rate",
-                            desc: "Buffalo aur Cow ke liye alag fixed ₹/liter",
-                            example: "Buffalo ₹60/L, Cow ₹40/L"
-                        },
-                    ].map(opt => (
-                        <button key={opt.val} onClick={() => f("pricingMode", opt.val)}
-                            className={`w-full p-3 rounded-xl border-2 text-left transition-all ${form.pricingMode === opt.val ? "border-brand-500 bg-brand-50" : "border-gray-200 hover:border-gray-300 bg-white"}`}>
-                            <div className="flex items-start gap-3">
-                                <span className="text-2xl mt-0.5">{opt.icon}</span>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <p className={`font-semibold text-sm ${form.pricingMode === opt.val ? "text-brand-700" : "text-gray-800"}`}>{opt.label}</p>
-                                        {form.pricingMode === opt.val && <span className="text-xs bg-brand-600 text-white px-2 py-0.5 rounded-full">Active</span>}
-                                    </div>
-                                    <p className="text-xs text-gray-500 mt-0.5">{opt.desc}</p>
-                                    <p className="text-xs text-brand-600 font-mono mt-1">{opt.example}</p>
+                        { val: "fat_only", icon: "📊", label: "Fat Only (Recommended)", desc: `Rate = Fat% × ₹${form.fatRate}  |  Fat 6% → ₹${(6 * form.fatRate).toFixed(2)}/L, Fat 7% → ₹${(7 * form.fatRate).toFixed(2)}/L` },
+                        { val: "fat_snf", icon: "🧪", label: "Fat + SNF", desc: `Rate = (Fat%×₹${form.fatRate}) + (SNF%×₹${form.snfRate})` },
+                        { val: "fixed", icon: "💰", label: "Fixed Rate", desc: `Buffalo ₹${form.buffaloFixedRate}/L, Cow ₹${form.cowFixedRate}/L` },
+                    ].map(m => (
+                        <button key={m.val} onClick={() => f("pricingMode", m.val)}
+                            className={`w-full p-3 rounded-xl border-2 text-left transition-all ${form.pricingMode === m.val ? "border-brand-500 bg-brand-50" : "border-gray-100 bg-gray-50 hover:border-gray-200"}`}>
+                            <div className="flex items-center gap-2">
+                                <span className="text-lg">{m.icon}</span>
+                                <div>
+                                    <p className={`text-sm font-semibold ${form.pricingMode === m.val ? "text-brand-700" : "text-gray-700"}`}>
+                                        {m.label} {form.pricingMode === m.val && <span className="text-xs bg-brand-600 text-white px-1.5 py-0.5 rounded-full ml-1">Active</span>}
+                                    </p>
+                                    <p className="text-xs text-gray-500 font-mono">{m.desc}</p>
                                 </div>
                             </div>
                         </button>
@@ -89,56 +69,56 @@ export default function RateSettingsPage() {
                 </div>
             </div>
 
-            {/* Fat Rate Settings */}
+            {/* === FAT RATE (fat_only and fat_snf) === */}
             {(form.pricingMode === "fat_only" || form.pricingMode === "fat_snf") && (
-                <div className="card">
-                    <h2 className="font-semibold text-gray-800 mb-4">Rate Configuration</h2>
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Fat Rate (₹ per 1% per liter)
-                            </label>
-                            <input type="number" className="input-field" value={form.fatRate}
-                                onChange={e => f("fatRate", parseFloat(e.target.value))} step="0.01" min="0.01" />
-                            <p className="text-xs text-gray-400 mt-1">
-                                Example: Fat 6% × ₹{form.fatRate} = ₹{(6 * form.fatRate).toFixed(2)}/L
-                            </p>
-                        </div>
+                <div className="card space-y-4">
+                    <p className="text-sm font-semibold text-gray-700">Fat Rate</p>
+                    <div>
+                        <label className="block text-xs text-gray-500 mb-1">₹ per 1% fat per liter</label>
+                        <input type="number" className="input-field" value={form.fatRate}
+                            onChange={e => f("fatRate", parseFloat(e.target.value))} step="0.01" min="0.01" />
+                        <p className="text-xs text-brand-600 mt-1 font-mono">
+                            Fat 5.5% → ₹{(5.5 * form.fatRate).toFixed(2)}/L &nbsp;|&nbsp;
+                            Fat 6.0% → ₹{(6.0 * form.fatRate).toFixed(2)}/L &nbsp;|&nbsp;
+                            Fat 7.0% → ₹{(7.0 * form.fatRate).toFixed(2)}/L
+                        </p>
+                    </div>
 
-                        {form.pricingMode === "fat_snf" && (
+                    {/* SNF section — only show when fat_snf mode */}
+                    {form.pricingMode === "fat_snf" && (
+                        <>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    SNF Rate (₹ per 1% per liter)
-                                </label>
+                                <label className="block text-xs text-gray-500 mb-1">SNF Rate — ₹ per 1% SNF per liter</label>
                                 <input type="number" className="input-field" value={form.snfRate}
                                     onChange={e => f("snfRate", parseFloat(e.target.value))} step="0.01" min="0.01" />
-                                <p className="text-xs text-gray-400 mt-1">
-                                    Example: SNF 9% × ₹{form.snfRate} = ₹{(9 * form.snfRate).toFixed(2)}/L
-                                </p>
                             </div>
-                        )}
-                    </div>
+                            <div className="flex items-center justify-between p-3 bg-blue-50 rounded-xl border border-blue-100">
+                                <div>
+                                    <p className="text-sm font-medium text-blue-800">SNF Auto Calculate</p>
+                                    <p className="text-xs text-blue-600">Formula: SNF = (CLR÷4) + (0.25×FAT) + 0.44</p>
+                                </div>
+                                <button onClick={() => f("autoCalcSnf", !form.autoCalcSnf)}
+                                    className={`relative w-11 h-6 rounded-full transition-colors ${form.autoCalcSnf ? "bg-blue-500" : "bg-gray-300"}`}>
+                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${form.autoCalcSnf ? "left-6" : "left-1"}`} />
+                                </button>
+                            </div>
+                        </>
+                    )}
                 </div>
             )}
 
-            {/* Fixed Rate Settings */}
+            {/* === FIXED RATE === */}
             {form.pricingMode === "fixed" && (
                 <div className="card">
-                    <h2 className="font-semibold text-gray-800 mb-4">Fixed Rate per Liter</h2>
-                    <div className="grid grid-cols-2 gap-4">
+                    <p className="text-sm font-semibold text-gray-700 mb-3">Fixed Rate ₹/Liter</p>
+                    <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <div className="flex items-center gap-2 mb-2">
-                                <span className="text-xl">🐃</span>
-                                <label className="text-sm font-medium text-gray-700">Buffalo ₹/L</label>
-                            </div>
+                            <label className="flex items-center gap-1 text-xs text-gray-500 mb-1"><span>🐃</span> Buffalo</label>
                             <input type="number" className="input-field" value={form.buffaloFixedRate}
                                 onChange={e => f("buffaloFixedRate", parseFloat(e.target.value))} step="1" />
                         </div>
                         <div>
-                            <div className="flex items-center gap-2 mb-2">
-                                <span className="text-xl">🐄</span>
-                                <label className="text-sm font-medium text-gray-700">Cow ₹/L</label>
-                            </div>
+                            <label className="flex items-center gap-1 text-xs text-gray-500 mb-1"><span>🐄</span> Cow</label>
                             <input type="number" className="input-field" value={form.cowFixedRate}
                                 onChange={e => f("cowFixedRate", parseFloat(e.target.value))} step="1" />
                         </div>
@@ -146,79 +126,54 @@ export default function RateSettingsPage() {
                 </div>
             )}
 
-            {/* SNF Auto Calc */}
-            {form.pricingMode === "fat_snf" && (
-                <div className="card">
-                    <div className="flex items-center justify-between mb-2">
-                        <div>
-                            <h2 className="font-semibold text-gray-800">SNF Auto Calculate</h2>
-                            <p className="text-xs text-gray-500 mt-0.5">SNF = (CLR÷4) + (0.25×FAT) + 0.44</p>
-                        </div>
-                        <button onClick={() => f("autoCalcSnf", !form.autoCalcSnf)}
-                            className={`relative w-12 h-6 rounded-full transition-colors ${form.autoCalcSnf ? "bg-brand-500" : "bg-gray-300"}`}>
-                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${form.autoCalcSnf ? "left-7" : "left-1"}`} />
-                        </button>
-                    </div>
-                    <p className="text-xs text-gray-400">
-                        {form.autoCalcSnf ? "✅ SNF auto calculate hoga (CLR se ya Fat formula se)" : "❌ SNF manually enter karna hoga entry ke time"}
-                    </p>
-                </div>
-            )}
-
-            {/* Min Rate */}
+            {/* === MIN RATE === */}
             <div className="card">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between">
                     <div>
-                        <h2 className="font-semibold text-gray-800">Minimum Rate Guarantee</h2>
-                        <p className="text-xs text-gray-500">Calculated rate se kam nahi denge</p>
+                        <p className="text-sm font-semibold text-gray-700">Minimum Rate Guarantee</p>
+                        <p className="text-xs text-gray-400">Calculated rate se kam nahi milega</p>
                     </div>
                     <button onClick={() => f("useMinRate", !form.useMinRate)}
-                        className={`relative w-12 h-6 rounded-full transition-colors ${form.useMinRate ? "bg-brand-500" : "bg-gray-300"}`}>
-                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${form.useMinRate ? "left-7" : "left-1"}`} />
+                        className={`relative w-11 h-6 rounded-full transition-colors ${form.useMinRate ? "bg-brand-500" : "bg-gray-300"}`}>
+                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${form.useMinRate ? "left-6" : "left-1"}`} />
                     </button>
                 </div>
                 {form.useMinRate && (
                     <div className="mt-3">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Minimum ₹/Liter</label>
+                        <label className="block text-xs text-gray-500 mb-1">Min ₹/Liter</label>
                         <input type="number" className="input-field" value={form.minRatePerLiter}
                             onChange={e => f("minRatePerLiter", parseFloat(e.target.value))} step="1" />
                     </div>
                 )}
             </div>
 
-            {/* Live Calculator */}
-            <div className="card bg-gradient-to-br from-orange-50 to-amber-50 border-orange-100">
-                <h2 className="font-semibold text-gray-800 mb-3">🧮 Live Calculator</h2>
-                <div className="grid grid-cols-2 gap-3 mb-4">
+            {/* === LIVE CALCULATOR === */}
+            <div className="card bg-amber-50 border-amber-100">
+                <p className="text-sm font-semibold text-gray-700 mb-3">🧮 Live Calculator</p>
+                <div className="grid grid-cols-2 gap-3 mb-3">
                     <div>
                         <label className="block text-xs text-gray-500 mb-1">Fat %</label>
-                        <input type="number" value={previewFat} step="0.1" min="1" max="15"
-                            onChange={e => setPreviewFat(parseFloat(e.target.value))}
-                            className="input-field text-center font-semibold" />
+                        <input type="number" value={fat} step="0.1" min="1" max="15"
+                            onChange={e => setFat(parseFloat(e.target.value) || 0)}
+                            className="input-field text-center font-bold" />
                     </div>
                     <div>
                         <label className="block text-xs text-gray-500 mb-1">Liters</label>
-                        <input type="number" value={previewLiters} step="1" min="1"
-                            onChange={e => setPreviewLiters(parseInt(e.target.value))}
-                            className="input-field text-center font-semibold" />
+                        <input type="number" value={liters} step="1" min="1"
+                            onChange={e => setLiters(parseInt(e.target.value) || 1)}
+                            className="input-field text-center font-bold" />
                     </div>
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2">
                     {[["🐃 Buffalo", bufCalc], ["🐄 Cow", cowCalc]].map(([label, calc]: any) => (
-                        <div key={label as string} className="bg-white rounded-xl p-3 border border-orange-100">
-                            <p className="text-xs font-semibold text-gray-600 mb-2">{label}</p>
-                            <p className="text-2xl font-bold text-brand-600">₹{calc.ratePerLiter}</p>
-                            <p className="text-sm text-gray-500">per liter</p>
-                            <div className="border-t border-gray-100 mt-2 pt-2">
-                                <p className="text-sm font-semibold text-gray-800">Total: ₹{calc.totalAmount}</p>
-                                {form.pricingMode !== "fixed" && (
-                                    <p className="text-xs text-gray-400 mt-0.5 font-mono break-all">{calc.formula}</p>
-                                )}
-                                {form.pricingMode === "fat_snf" && (
-                                    <p className="text-xs text-blue-500 mt-0.5">SNF: {calc.snfPercent}%</p>
-                                )}
-                            </div>
+                        <div key={label as string} className="bg-white rounded-xl p-3 border border-amber-100">
+                            <p className="text-xs font-medium text-gray-500 mb-1">{label}</p>
+                            <p className="text-xl font-bold text-brand-600">₹{calc.ratePerLiter}/L</p>
+                            <p className="text-sm font-semibold text-gray-800">₹{calc.totalAmount} total</p>
+                            {form.pricingMode === "fat_snf" && (
+                                <p className="text-xs text-blue-500 mt-1">SNF: {calc.snfPercent}%</p>
+                            )}
+                            <p className="text-xs text-gray-400 mt-1 font-mono leading-tight break-all">{calc.formula}</p>
                         </div>
                     ))}
                 </div>

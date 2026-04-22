@@ -1,5 +1,13 @@
+/**
+ * Smart Dairy Solution - Rate Calculator
+ * 3 Modes:
+ * 1. fat_only  → Rate = Fat% × fatRate
+ * 2. fat_snf   → Rate = (Fat% × fatRate) + (SNF% × snfRate)  
+ * 3. fixed     → Rate = buffaloFixedRate or cowFixedRate
+ */
+
 export interface RateConfig {
-  pricingMode: "fat_snf" | "fat_only" | "fixed";
+  pricingMode: "fat_only" | "fat_snf" | "fixed";
   fatRate: number;
   snfRate: number;
   buffaloFixedRate: number;
@@ -24,7 +32,7 @@ export function calcSNF(fat: number, clr?: number, milkType?: string): number {
   if (clr && clr > 0) {
     return parseFloat(Math.min(Math.max((clr / 4) + (0.25 * fat) + 0.44, 7.0), 11.0).toFixed(2));
   }
-  let snf = milkType === "BUFFALO" ? 0.21 * fat + 8.5
+  const snf = milkType === "BUFFALO" ? 0.21 * fat + 8.5
     : milkType === "COW" ? 0.21 * fat + 7.9
       : 0.21 * fat + 8.2;
   return parseFloat(Math.min(Math.max(snf, 7.0), 11.0).toFixed(2));
@@ -38,44 +46,46 @@ export function calcRates(
   snfInput?: number,
   clr?: number
 ) {
-  const snfPercent = (snfInput && snfInput > 0) ? snfInput
-    : config.autoCalcSnf ? calcSNF(fat, clr, milkType) : 0;
+  const snfPercent = (config.pricingMode === "fat_snf")
+    ? (snfInput && snfInput > 0 ? snfInput : (config.autoCalcSnf ? calcSNF(fat, clr, milkType) : 0))
+    : calcSNF(fat, clr, milkType); // always calc for display, just dont use in rate
 
-  const fatKg = (fat / 100) * liters;
-  const snfKg = (snfPercent / 100) * liters;
+  const fatKg = parseFloat(((fat / 100) * liters).toFixed(3));
+  const snfKg = parseFloat(((snfPercent / 100) * liters).toFixed(3));
 
   let ratePerLiter: number;
-  let fatAmount: number;
-  let snfAmount = 0;
-  let formula = "";
+  let fatAmount: number = 0;
+  let snfAmount: number = 0;
+  let formula: string = "";
 
   if (config.pricingMode === "fixed") {
     ratePerLiter = milkType === "BUFFALO" ? config.buffaloFixedRate
       : milkType === "COW" ? config.cowFixedRate
         : (config.buffaloFixedRate + config.cowFixedRate) / 2;
-    fatAmount = 0;
     formula = `Fixed ₹${ratePerLiter}/L`;
 
-  } else if (config.pricingMode === "fat_only") {
-    fatAmount = fat * config.fatRate;
-    ratePerLiter = fatAmount;
-    formula = `${fat}% × ₹${config.fatRate} = ₹${ratePerLiter.toFixed(2)}/L`;
-
-  } else {
+  } else if (config.pricingMode === "fat_snf") {
     fatAmount = fat * config.fatRate;
     snfAmount = snfPercent * config.snfRate;
     ratePerLiter = fatAmount + snfAmount;
-    formula = `Fat(${fat}%×${config.fatRate}) + SNF(${snfPercent}%×${config.snfRate}) = ₹${ratePerLiter.toFixed(2)}/L`;
+    formula = `Fat ${fat}%×₹${config.fatRate} + SNF ${snfPercent}%×₹${config.snfRate} = ₹${ratePerLiter.toFixed(2)}/L`;
+
+  } else {
+    // fat_only (default)
+    fatAmount = fat * config.fatRate;
+    ratePerLiter = fatAmount;
+    formula = `Fat ${fat}% × ₹${config.fatRate} = ₹${ratePerLiter.toFixed(2)}/L`;
   }
 
   if (config.useMinRate && ratePerLiter < config.minRatePerLiter) {
     ratePerLiter = config.minRatePerLiter;
+    formula += ` → Min ₹${config.minRatePerLiter} applied`;
   }
 
   return {
     snfPercent,
-    fatKg: parseFloat(fatKg.toFixed(3)),
-    snfKg: parseFloat(snfKg.toFixed(3)),
+    fatKg,
+    snfKg,
     fatAmount: parseFloat(fatAmount.toFixed(2)),
     snfAmount: parseFloat(snfAmount.toFixed(2)),
     ratePerLiter: parseFloat(ratePerLiter.toFixed(2)),
