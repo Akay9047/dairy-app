@@ -20,17 +20,14 @@ interface MilkEntry {
 
 function calcPreview(liters: number, fat: number, milkType: string = "MIXED", config: any) {
   const cfg = {
-    rateType: (config?.rateType ?? "fat") as "fat" | "fixed",
-    fatRatePerKg: config?.fatRatePerKg ?? DEFAULT_CONFIG.fatRatePerKg,
-    snfRatePerKg: config?.snfRatePerKg ?? DEFAULT_CONFIG.snfRatePerKg,
-    minRatePerLiter: config?.minRatePerLiter ?? DEFAULT_CONFIG.minRatePerLiter,
-    useMinRate: config?.useMinRate ?? true,
-    buffaloFatRate: config?.buffaloFatRate ?? DEFAULT_CONFIG.buffaloFatRate,
-    cowFatRate: config?.cowFatRate ?? DEFAULT_CONFIG.cowFatRate,
-    buffaloSnfRate: config?.buffaloSnfRate ?? DEFAULT_CONFIG.buffaloSnfRate,
-    cowSnfRate: config?.cowSnfRate ?? DEFAULT_CONFIG.cowSnfRate,
+    pricingMode: (config?.pricingMode ?? "fat_only") as "fat_only" | "fat_snf" | "fixed",
+    fatRate: config?.fatRate ?? DEFAULT_CONFIG.fatRate,
+    snfRate: config?.snfRate ?? DEFAULT_CONFIG.snfRate,
     buffaloFixedRate: config?.buffaloFixedRate ?? DEFAULT_CONFIG.buffaloFixedRate,
     cowFixedRate: config?.cowFixedRate ?? DEFAULT_CONFIG.cowFixedRate,
+    minRatePerLiter: config?.minRatePerLiter ?? DEFAULT_CONFIG.minRatePerLiter,
+    useMinRate: config?.useMinRate ?? false,
+    autoCalcSnf: config?.autoCalcSnf ?? true,
   };
   return calcRates(liters, fat, milkType, cfg);
 }
@@ -119,8 +116,8 @@ function MilkModal({ entry, farmers, onClose }: { entry?: MilkEntry; farmers: Fa
           {admin?.rateConfig && (
             <div className="text-xs text-gray-400 flex gap-3 bg-gray-50 rounded-lg px-3 py-2">
               <span>Min: ₹{admin.rateConfig.minRatePerLiter}/L</span>
-              <span>Fat: ₹{admin.rateConfig.fatRatePerKg}/kg</span>
-              <span>SNF: ₹{admin.rateConfig.snfRatePerKg}/kg</span>
+              <span>Mode: {admin.rateConfig.pricingMode ?? "fat_only"}</span>
+              <span>Fat Rate: ₹{admin.rateConfig.fatRate ?? 0.33}/L%</span>
             </div>
           )}
           {preview && (
