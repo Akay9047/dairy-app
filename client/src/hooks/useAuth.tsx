@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { authApi } from "../lib/api";
- 
+
 interface Admin {
   id: string;
   name: string;
@@ -10,14 +10,20 @@ interface Admin {
   dairyId?: string;
   dairyName?: string;
   rateConfig?: {
-    fatRatePerKg: number;
-    snfRatePerKg: number;
-    minRatePerLiter: number;
-    useMinRate: boolean;
-    milkType?: string;
+    pricingMode?: string;
+    fatRate?: number;
+    snfRate?: number;
+    buffaloFixedRate?: number;
+    cowFixedRate?: number;
+    minRatePerLiter?: number;
+    useMinRate?: boolean;
+    autoCalcSnf?: boolean;
+    // legacy fields (kept for compatibility)
+    fatRatePerKg?: number;
+    snfRatePerKg?: number;
   };
 }
- 
+
 interface AuthContextType {
   admin: Admin | null;
   token: string | null;
@@ -26,24 +32,24 @@ interface AuthContextType {
   logout: () => void;
   isLoading: boolean;
 }
- 
+
 const AuthContext = createContext<AuthContextType | null>(null);
- 
+
 // Alag alag keys — super admin aur admin ek dusre ko overwrite nahi karenge
 const ADMIN_TOKEN_KEY = "dairy_admin_token";
 const ADMIN_DATA_KEY = "dairy_admin_data";
 const SA_TOKEN_KEY = "dairy_sa_token";
 const SA_DATA_KEY = "dairy_sa_data";
- 
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [admin, setAdmin] = useState<Admin | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
- 
+
   useEffect(() => {
     // Check current page to decide which session to load
     const isSuperPage = window.location.pathname.startsWith("/super");
- 
+
     if (isSuperPage) {
       const saToken = localStorage.getItem(SA_TOKEN_KEY);
       const saData = localStorage.getItem(SA_DATA_KEY);
@@ -61,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setIsLoading(false);
   }, []);
- 
+
   const login = async (username: string, password: string) => {
     const data = await authApi.login({ username, password });
     const adminObj = { ...data.admin, role: "admin" };
@@ -70,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(data.token);
     setAdmin(adminObj);
   };
- 
+
   const superLogin = async (username: string, password: string) => {
     const data = await authApi.superLogin({ username, password });
     const saObj = { ...data.superAdmin, role: "superadmin" };
@@ -79,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(data.token);
     setAdmin(saObj);
   };
- 
+
   const logout = () => {
     const isSuperPage = window.location.pathname.startsWith("/super");
     if (isSuperPage) {
@@ -92,17 +98,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null);
     setAdmin(null);
   };
- 
+
   return (
     <AuthContext.Provider value={{ admin, token, login, superLogin, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
 }
- 
+
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be inside AuthProvider");
   return ctx;
 }
- 
