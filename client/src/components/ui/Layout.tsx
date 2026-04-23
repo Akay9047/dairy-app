@@ -6,6 +6,7 @@ import { useLanguage } from "../../hooks/useLanguage";
 import { authApi } from "../../lib/api";
 import toast from "react-hot-toast";
 import type { Language } from "../../lib/i18n";
+import OfflineIndicator from "./OfflineIndicator";
 
 function ChangeMyPasswordModal({ onClose }: { onClose: () => void }) {
   const [current, setCurrent] = useState("");
@@ -158,6 +159,7 @@ export default function Layout() {
             className="p-2 rounded-xl hover:bg-gray-100 active:scale-95 transition-all">
             <Menu size={22} className="text-gray-600" />
           </button>
+          <OfflineIndicator />
         </header>
 
         {/* Main Content */}
