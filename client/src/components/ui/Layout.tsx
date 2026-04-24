@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, Droplets, BarChart3, CreditCard, LogOut, X, AlertCircle, Globe, KeyRound, Settings, Menu, FileText } from "lucide-react";
+import { LayoutDashboard, Users, Droplets, BarChart3, CreditCard, LogOut, X, AlertCircle, Globe, KeyRound, Settings, FileText } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { useLanguage } from "../../hooks/useLanguage";
 import { authApi } from "../../lib/api";
@@ -23,20 +23,22 @@ function ChangeMyPasswordModal({ onClose }: { onClose: () => void }) {
     finally { setLoading(false); }
   };
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="font-semibold">Password Change</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
+    <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, background: "rgba(0,0,0,0.5)" }}>
+      <div style={{ background: "var(--color-background-primary)", borderRadius: 20, width: "100%", maxWidth: 360, overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderBottom: "0.5px solid var(--color-border-tertiary)" }}>
+          <span style={{ fontWeight: 600, fontSize: 15 }}>Password Change</span>
+          <button onClick={onClose} style={{ padding: 4, borderRadius: 8, border: "none", background: "none", cursor: "pointer" }}><X size={18} /></button>
         </div>
-        <form onSubmit={handleSubmit} className="p-4 space-y-3">
+        <form onSubmit={handleSubmit} style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
           {[["Current Password", current, setCurrent], ["Naya Password", newPw, setNewPw], ["Confirm Password", confirm, setConfirm]].map(([label, val, setter]: any) => (
-            <div key={label}><label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-              <input type="password" className="input-field" value={val} onChange={e => setter(e.target.value)} required /></div>
+            <div key={label as string}>
+              <label style={{ display: "block", fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 4 }}>{label}</label>
+              <input type="password" className="input-field" value={val} onChange={e => setter(e.target.value)} required />
+            </div>
           ))}
-          <div className="flex gap-2 pt-1">
-            <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>
-            <button type="submit" disabled={loading} className="btn-primary flex-1">{loading ? "..." : "Change"}</button>
+          <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+            <button type="button" onClick={onClose} className="btn-secondary" style={{ flex: 1 }}>Cancel</button>
+            <button type="submit" disabled={loading} className="btn-primary" style={{ flex: 1 }}>{loading ? "..." : "Change"}</button>
           </div>
         </form>
       </div>
@@ -63,7 +65,6 @@ export default function Layout() {
     { to: "/rate-settings", icon: Settings, label: "Rate Settings" },
   ];
 
-  // Bottom nav — 5 most used
   const bottomNavItems = [
     { to: "/dashboard", icon: LayoutDashboard, label: "Home" },
     { to: "/milk", icon: Droplets, label: "Doodh" },
@@ -76,109 +77,127 @@ export default function Layout() {
   const langLabels: Record<Language, string> = { hindi: "हिन्दी", english: "English", hinglish: "Hinglish" };
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-orange-100 bg-gradient-to-br from-orange-50 to-white">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 bg-brand-600 rounded-full flex items-center justify-center text-2xl shadow">🐄</div>
-          <div>
-            <p className="font-bold text-gray-900 text-sm">Smart Dairy</p>
-            <p className="text-xs text-brand-600 font-medium">{admin?.dairyName ?? "Digital Dairy"}</p>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div style={{ padding: "16px", borderBottom: "0.5px solid var(--color-border-tertiary)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 38, height: 38, background: "#ea580c", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>🐄</div>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontWeight: 600, fontSize: 13, margin: 0, color: "var(--color-text-primary)" }}>Smart Dairy</p>
+            <p style={{ fontSize: 11, color: "#ea580c", margin: 0, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{admin?.dairyName ?? "Digital Dairy"}</p>
           </div>
         </div>
       </div>
-      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+
+      <nav style={{ flex: 1, padding: "8px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
         {allNavItems.map(({ to, icon: Icon, label }) => (
           <NavLink key={to} to={to} onClick={() => setSidebarOpen(false)}
-            className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? "bg-brand-600 text-white shadow-sm" : "text-gray-600 hover:bg-orange-50 hover:text-brand-700"}`}>
-            <Icon size={17} />{label}
+            style={({ isActive }) => ({
+              display: "flex", alignItems: "center", gap: 10, padding: "9px 10px",
+              borderRadius: 10, fontSize: 13, fontWeight: 500, textDecoration: "none", transition: "all 0.15s",
+              background: isActive ? "#ea580c" : "transparent",
+              color: isActive ? "white" : "var(--color-text-secondary)",
+            })}>
+            <Icon size={16} />
+            <span>{label}</span>
           </NavLink>
         ))}
       </nav>
-      <div className="p-3 border-t border-orange-100 space-y-1">
-        <div className="relative">
-          <button onClick={() => setShowLangMenu(v => !v)}
-            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-xl">
-            <Globe size={15} /><span>{langLabels[lang]}</span><span className="ml-auto">▾</span>
+
+      <div style={{ padding: "8px", borderTop: "0.5px solid var(--color-border-tertiary)", display: "flex", flexDirection: "column", gap: 2 }}>
+        <div style={{ position: "relative" }}>
+          <button onClick={() => setShowLangMenu(v => !v)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", borderRadius: 10, border: "none", background: "transparent", cursor: "pointer", fontSize: 13, color: "var(--color-text-secondary)" }}>
+            <Globe size={15} /><span>{langLabels[lang]}</span><span style={{ marginLeft: "auto", fontSize: 10 }}>▾</span>
           </button>
           {showLangMenu && (
-            <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border rounded-xl shadow-lg overflow-hidden z-20">
+            <div style={{ position: "absolute", bottom: "100%", left: 0, right: 0, background: "var(--color-background-primary)", border: "0.5px solid var(--color-border-tertiary)", borderRadius: 10, overflow: "hidden", zIndex: 20 }}>
               {(["hinglish", "hindi", "english"] as Language[]).map(l => (
-                <button key={l} onClick={async () => { setLang(l); setShowLangMenu(false); try { await authApi.updateLanguage(l); } catch {} }}
-                  className={`w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 ${lang === l ? "text-brand-600 font-semibold bg-brand-50" : "text-gray-700"}`}>
+                <button key={l} onClick={async () => { setLang(l); setShowLangMenu(false); try { await authApi.updateLanguage(l); } catch { } }}
+                  style={{ width: "100%", textAlign: "left", padding: "9px 12px", border: "none", background: lang === l ? "#fff7ed" : "transparent", color: lang === l ? "#ea580c" : "var(--color-text-primary)", cursor: "pointer", fontSize: 13, fontWeight: lang === l ? 600 : 400 }}>
                   {langLabels[l]}
                 </button>
               ))}
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl">
-          <div className="w-8 h-8 bg-brand-600 rounded-full flex items-center justify-center text-white font-bold text-sm">{admin?.name?.[0]}</div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-900 truncate">{admin?.name}</p>
-            <p className="text-xs text-gray-500">Admin</p>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "var(--color-background-secondary)", borderRadius: 10 }}>
+          <div style={{ width: 30, height: 30, background: "#ea580c", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700, fontSize: 13, flexShrink: 0 }}>{admin?.name?.[0]}</div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <p style={{ fontSize: 12, fontWeight: 600, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{admin?.name}</p>
+            <p style={{ fontSize: 11, color: "var(--color-text-secondary)", margin: 0 }}>Admin</p>
           </div>
         </div>
-        <button onClick={() => setShowPwModal(true)} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-xl">
+
+        <button onClick={() => setShowPwModal(true)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", borderRadius: 10, border: "none", background: "transparent", cursor: "pointer", fontSize: 13, color: "var(--color-text-secondary)" }}>
           <KeyRound size={15} /> Password Change
         </button>
-        <button onClick={handleLogout} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-xl font-medium">
-          <LogOut size={16} />{t("logout")}
+        <button onClick={handleLogout} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", borderRadius: 10, border: "none", background: "transparent", cursor: "pointer", fontSize: 13, color: "#dc2626", fontWeight: 500 }}>
+          <LogOut size={15} />{t("logout")}
         </button>
       </div>
     </div>
   );
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div style={{ display: "flex", height: "100dvh", background: "var(--color-background-tertiary)" }}>
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-56 bg-white border-r border-orange-100 flex-col flex-shrink-0 shadow-sm">
+      <aside style={{ display: "none", width: 220, background: "var(--color-background-primary)", borderRight: "0.5px solid var(--color-border-tertiary)", flexDirection: "column", flexShrink: 0 }}
+        className="md-sidebar">
         <SidebarContent />
       </aside>
 
-      {/* Mobile Sidebar Overlay */}
+      {/* Mobile Overlay */}
       {sidebarOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-white shadow-2xl">
+        <div style={{ position: "fixed", inset: 0, zIndex: 50 }}>
+          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)" }} onClick={() => setSidebarOpen(false)} />
+          <aside style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 240, background: "var(--color-background-primary)", boxShadow: "4px 0 24px rgba(0,0,0,0.15)" }}>
             <SidebarContent />
           </aside>
         </div>
       )}
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile Top Header */}
-        <header className="md:hidden bg-white border-b border-orange-100 px-4 py-3 flex items-center justify-between sticky top-0 z-30 shadow-sm">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-brand-600 rounded-full flex items-center justify-center text-lg shadow-sm">🐄</div>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        {/* Mobile Header — Style A */}
+        <header style={{ background: "var(--color-background-primary)", borderBottom: "0.5px solid var(--color-border-tertiary)", padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 30 }}>
+          {/* Left — Logo */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, background: "#ea580c", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🐄</div>
             <div>
-              <p className="font-bold text-gray-900 text-sm leading-tight">Smart Dairy</p>
-              <p className="text-xs text-brand-600 leading-tight">{admin?.dairyName ?? "Digital Dairy"}</p>
+              <p style={{ fontWeight: 700, fontSize: 14, margin: 0, lineHeight: 1.2, color: "var(--color-text-primary)" }}>Smart Dairy</p>
+              <p style={{ fontSize: 11, color: "#ea580c", margin: 0, fontWeight: 500 }}>{admin?.dairyName ?? "Digital Dairy"}</p>
             </div>
           </div>
-          <button onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-xl hover:bg-gray-100 active:scale-95 transition-all">
-            <Menu size={22} className="text-gray-600" />
-          </button>
-          <OfflineIndicator />
+
+          {/* Right — actions */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <OfflineIndicator />
+            <button onClick={() => setSidebarOpen(true)}
+              style={{ width: 36, height: 36, background: "var(--color-background-secondary)", borderRadius: 10, border: "0.5px solid var(--color-border-tertiary)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+                <rect y="0" width="16" height="2" rx="1" fill="currentColor" />
+                <rect y="5" width="12" height="2" rx="1" fill="currentColor" />
+                <rect y="10" width="14" height="2" rx="1" fill="currentColor" />
+              </svg>
+            </button>
+          </div>
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
+        <main style={{ flex: 1, overflowY: "auto", paddingBottom: 72 }}>
           <Outlet />
         </main>
 
-        {/* Mobile Bottom Navigation */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-40 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
-          <div className="flex h-16 max-w-screen-sm mx-auto">
+        {/* Bottom Navigation — Style A */}
+        <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "var(--color-background-primary)", borderTop: "0.5px solid var(--color-border-tertiary)", zIndex: 40, paddingBottom: "env(safe-area-inset-bottom)" }}>
+          <div style={{ display: "flex", height: 60 }}>
             {bottomNavItems.map(({ to, icon: Icon, label }) => (
-              <NavLink key={to} to={to}
-                className={({ isActive }) => `flex-1 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${isActive ? "text-brand-600" : "text-gray-400"}`}>
+              <NavLink key={to} to={to} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, textDecoration: "none" }}>
                 {({ isActive }) => (
                   <>
-                    <div className={`p-1.5 rounded-xl transition-all ${isActive ? "bg-brand-50 scale-110" : ""}`}>
-                      <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
+                    <div style={{ width: 40, height: 32, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", background: isActive ? "#fff7ed" : "transparent", transition: "all 0.15s" }}>
+                      <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} color={isActive ? "#ea580c" : "var(--color-text-tertiary)"} />
                     </div>
-                    <span className={`text-xs font-medium ${isActive ? "text-brand-600" : "text-gray-400"}`}>{label}</span>
+                    <span style={{ fontSize: 10, fontWeight: isActive ? 600 : 400, color: isActive ? "#ea580c" : "var(--color-text-tertiary)" }}>{label}</span>
                   </>
                 )}
               </NavLink>
@@ -186,6 +205,7 @@ export default function Layout() {
           </div>
         </nav>
       </div>
+
       {showPwModal && <ChangeMyPasswordModal onClose={() => setShowPwModal(false)} />}
     </div>
   );
