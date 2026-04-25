@@ -46,11 +46,14 @@ function MilkModal({ entry, farmers, onClose }: { entry?: MilkEntry; farmers: Fa
     fatPercent: entry?.fatPercent.toString() ?? "",
   });
 
+  // Fetch rate config fresh from API
+  const { data: rateConfig } = useQuery({ queryKey: ["rate-settings"], queryFn: () => import("../lib/api").then(m => m.rateSettingsApi.get()), staleTime: 60000 });
+
   const preview = useMemo(() => {
     const l = parseFloat(form.liters), f = parseFloat(form.fatPercent);
     if (isNaN(l) || isNaN(f) || l <= 0 || f < 0) return null;
-    return calcPreview(l, f, form.milkType, admin?.rateConfig);
-  }, [form.liters, form.fatPercent, form.milkType, admin?.rateConfig]);
+    return calcPreview(l, f, form.milkType, rateConfig ?? admin?.rateConfig);
+  }, [form.liters, form.fatPercent, form.milkType, rateConfig, admin?.rateConfig]);
 
   const mutation = useMutation({
     mutationFn: (d: any) => entry ? milkApi.update(entry.id, d) : milkApi.create(d),
@@ -60,7 +63,7 @@ function MilkModal({ entry, farmers, onClose }: { entry?: MilkEntry; farmers: Fa
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    mutation.mutate({ farmerId: form.farmerId, date: new Date(`${form.date}T${form.time}`).toISOString(), shift: form.shift, liters: parseFloat(form.liters), fatPercent: parseFloat(form.fatPercent) });
+    mutation.mutate({ farmerId: form.farmerId, date: new Date(`${form.date}T${form.time}`).toISOString(), shift: form.shift, milkType: form.milkType, liters: parseFloat(form.liters), fatPercent: parseFloat(form.fatPercent) });
   };
 
   return (
@@ -231,15 +234,16 @@ export default function MilkEntryPage() {
                         {entry.shift === "MORNING" ? `☀️ ${t("morning")}` : `🌙 ${t("evening")}`}
                       </span>
                       <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
-                        {entry.milkType === "BUFFALO" ? "🐃" : entry.milkType === "COW" ? "🐄" : "🐃🐄"}
+                        {!entry.milkType || entry.milkType === "MIXED" ? "🥛" : entry.milkType === "BUFFALO" ? "🐃" : "🐄"}
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 mt-0.5">{format(new Date(entry.date), "dd MMM yyyy, hh:mm a")} · {entry.farmer.village}</p>
                     <div className="flex gap-3 mt-1.5 text-sm flex-wrap">
                       <span className="text-gray-700">🥛 <b>{entry.liters.toFixed(2)}L</b></span>
                       <span className="text-gray-700">Fat <b>{entry.fatPercent.toFixed(1)}%</b></span>
-                      {entry.snfPercent && <span className="text-gray-700">SNF <b>{entry.snfPercent.toFixed(2)}%</b></span>}
+                      {entry.snfPercent && entry.snfPercent > 0 && <span className="text-gray-700">SNF <b>{entry.snfPercent.toFixed(1)}%</b></span>}
                       <span className="text-gray-700">₹<b>{entry.ratePerLiter.toFixed(2)}</b>/L</span>
+                      <span className="text-gray-700">= ₹<b>{entry.totalAmount.toFixed(0)}</b></span>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">

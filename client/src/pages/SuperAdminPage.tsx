@@ -4,499 +4,495 @@ import { superAdminApi, authApi } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { Plus, X, Power, Settings, LogOut, Users, Droplets, KeyRound, Trash2, Eye, BarChart3, ChevronLeft, IndianRupee } from "lucide-react";
-import { format } from "date-fns";
+import { X, Eye, Settings, Key, Power, Trash2, Plus, LogOut, TrendingUp, Users, Droplets, IndianRupee, RefreshCw, KeyRound, ChevronDown, ChevronUp } from "lucide-react";
 
-interface RateConfig {
-  fatRatePerKg: number; snfRatePerKg: number;
-  minRatePerLiter: number; useMinRate: boolean; milkType: string;
-}
-interface Dairy {
-  id: string; name: string; ownerName: string; mobile: string;
-  address?: string; isActive: boolean; createdAt: string;
-  admins: { id: string; username: string; name: string }[];
-  rateConfig: RateConfig | null;
-  _count: { farmers: number; milkEntries: number; payments: number };
-}
-
-// ── Modals ──────────────────────────────────────────────────────
-
-function CreateDairyModal({ onClose }: { onClose: () => void }) {
+// ── Rate Update Modal (New System) ─────────────────────────────
+function RateModal({ dairy, onClose }: { dairy: any; onClose: () => void }) {
   const qc = useQueryClient();
+  const existing = dairy.rateConfig ?? {};
   const [form, setForm] = useState({
-    name: "", ownerName: "", mobile: "", address: "",
-    adminUsername: "", adminPassword: "",
-    fatRatePerKg: 800, snfRatePerKg: 533, minRatePerLiter: 40, milkType: "mixed",
+    pricingMode: existing.pricingMode ?? "fat_only",
+    fatRate: existing.fatRate ?? 0.33,
+    snfRate: existing.snfRate ?? 0.07,
+    buffaloFixedRate: existing.buffaloFixedRate ?? 60,
+    cowFixedRate: existing.cowFixedRate ?? 40,
+    minRatePerLiter: existing.minRatePerLiter ?? 25,
+    useMinRate: existing.useMinRate ?? false,
+    autoCalcSnf: existing.autoCalcSnf ?? true,
   });
+
+  const mutation = useMutation({
+    mutationFn: (d: any) => superAdminApi.updateRates(dairy.id, d),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["sa-dairies"] }); toast.success("Rate update ho gaya! ✅"); onClose(); },
+    onError: (err: any) => toast.error(err.response?.data?.error ?? "Update nahi hua"),
+  });
+
   const f = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }));
-  const mutation = useMutation({
-    mutationFn: () => superAdminApi.createDairy(form),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["sa-dairies"] }); toast.success("Dairy create ho gayi! 🎉"); onClose(); },
-    onError: (err: any) => toast.error(err.response?.data?.error ?? "Error"),
-  });
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md my-4">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="font-semibold">Naya Dairy Banao</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
-        </div>
-        <div className="p-4 space-y-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase">Dairy Info</p>
-          {[["name","Dairy Name *","Ramesh Dairy"],["ownerName","Owner Name *","Ramesh Kumar"],["mobile","Mobile *","9876543210"],["address","Address","Sikar, Rajasthan"]].map(([k,l,p]) => (
-            <div key={k}>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{l}</label>
-              <input className="input-field" placeholder={p} value={(form as any)[k]} onChange={e => f(k, e.target.value)} />
-            </div>
-          ))}
-          <p className="text-xs font-semibold text-gray-500 uppercase pt-1">Admin Login</p>
-          {[["adminUsername","Username *","ramesh_dairy"],["adminPassword","Password *","dairy@1234"]].map(([k,l,p]) => (
-            <div key={k}>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{l}</label>
-              <input className="input-field" placeholder={p} value={(form as any)[k]} onChange={e => f(k, e.target.value)} />
-            </div>
-          ))}
-          <p className="text-xs font-semibold text-gray-500 uppercase pt-1">Rate Config (Rajasthan)</p>
-          <div className="grid grid-cols-3 gap-2">
-            {[["fatRatePerKg","Fat ₹/kg"],["snfRatePerKg","SNF ₹/kg"],["minRatePerLiter","Min ₹/L"]].map(([k,l]) => (
-              <div key={k}>
-                <label className="block text-xs font-medium text-gray-700 mb-1">{l}</label>
-                <input type="number" step="1" className="input-field text-sm" value={(form as any)[k]} onChange={e => f(k, parseFloat(e.target.value))} />
-              </div>
-            ))}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Milk Type</label>
-            <select className="input-field" value={form.milkType} onChange={e => f("milkType", e.target.value)}>
-              <option value="mixed">Mixed (Buffalo + Cow)</option>
-              <option value="buffalo">Sirf Buffalo</option>
-              <option value="cow">Sirf Cow</option>
-            </select>
-          </div>
-          <div className="flex gap-2 pt-2">
-            <button onClick={onClose} className="btn-secondary flex-1">Ruko</button>
-            <button onClick={() => mutation.mutate()} disabled={mutation.isPending} className="btn-primary flex-1">
-              {mutation.isPending ? "Creating..." : "Create Karein"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-function RatesModal({ dairy, onClose }: { dairy: Dairy; onClose: () => void }) {
-  const qc = useQueryClient();
-  const [form, setForm] = useState({
-    fatRatePerKg: dairy.rateConfig?.fatRatePerKg ?? 800,
-    snfRatePerKg: dairy.rateConfig?.snfRatePerKg ?? 533,
-    minRatePerLiter: dairy.rateConfig?.minRatePerLiter ?? 40,
-    useMinRate: dairy.rateConfig?.useMinRate ?? true,
-    milkType: dairy.rateConfig?.milkType ?? "mixed",
-  });
-  const mutation = useMutation({
-    mutationFn: () => superAdminApi.updateRates(dairy.id, form),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["sa-dairies"] }); toast.success("Rates update ho gaye!"); onClose(); },
-    onError: () => toast.error("Update nahi hua"),
-  });
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="font-semibold">Rate Update — {dairy.name}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
-        </div>
-        <div className="p-4 space-y-3">
-          {[["fatRatePerKg","Fat Rate ₹/kg"],["snfRatePerKg","SNF Rate ₹/kg"],["minRatePerLiter","Minimum Rate ₹/Liter"]].map(([k,l]) => (
-            <div key={k}>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{l}</label>
-              <input type="number" step="1" className="input-field" value={(form as any)[k]}
-                onChange={e => setForm(p => ({ ...p, [k]: parseFloat(e.target.value) }))} />
-            </div>
-          ))}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Milk Type</label>
-            <select className="input-field" value={form.milkType} onChange={e => setForm(p => ({ ...p, milkType: e.target.value }))}>
-              <option value="mixed">Mixed</option>
-              <option value="buffalo">Buffalo</option>
-              <option value="cow">Cow</option>
-            </select>
-          </div>
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input type="checkbox" checked={form.useMinRate} onChange={e => setForm(p => ({ ...p, useMinRate: e.target.checked }))} />
-            Minimum rate guarantee use karein
-          </label>
-          <div className="bg-orange-50 rounded-lg p-2 text-xs text-gray-600">
-            <p>Formula: Rate/L = (Fat/100×L×₹{form.fatRatePerKg} + SNF/100×L×₹{form.snfRatePerKg}) / L</p>
-            <p>Min guarantee: ₹{form.minRatePerLiter}/L</p>
-          </div>
-          <div className="flex gap-2 pt-1">
-            <button onClick={onClose} className="btn-secondary flex-1">Ruko</button>
-            <button onClick={() => mutation.mutate()} disabled={mutation.isPending} className="btn-primary flex-1">
-              {mutation.isPending ? "Saving..." : "Update"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ChangePasswordModal({ dairy, admin, onClose }: { dairy: Dairy; admin: { id: string; username: string; name: string }; onClose: () => void }) {
-  const [newPw, setNewPw] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [loading, setLoading] = useState(false);
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newPw !== confirm) { toast.error("Passwords match nahi!"); return; }
-    if (newPw.length < 6) { toast.error("6 characters minimum"); return; }
-    setLoading(true);
-    try {
-      await superAdminApi.changeAdminPassword(dairy.id, admin.id, newPw);
-      toast.success(`${admin.username} ka password change ho gaya! ✅`);
-      onClose();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error ?? "Error");
-    } finally { setLoading(false); }
+  // Live preview
+  const previewFat = 6.0;
+  const previewL = 10;
+  const getRate = (milkType: string) => {
+    if (form.pricingMode === "fixed") return milkType === "BUFFALO" ? form.buffaloFixedRate : form.cowFixedRate;
+    const fatAmt = previewFat * form.fatRate;
+    const snfAmt = form.pricingMode === "fat_snf" ? (0.21 * previewFat + 8.5) * form.snfRate : 0;
+    let rate = fatAmt + snfAmt;
+    if (form.useMinRate && rate < form.minRatePerLiter) rate = form.minRatePerLiter;
+    return rate;
   };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-4">
         <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="font-semibold">Password Change</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-4 space-y-3">
-          <div className="bg-orange-50 rounded-lg p-3 text-sm">
-            <p className="font-medium">{admin.name} <span className="text-xs text-gray-500">(@{admin.username})</span></p>
+          <div>
+            <h2 className="font-bold text-gray-900">Rate Settings</h2>
             <p className="text-xs text-gray-500">{dairy.name}</p>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Naya Password *</label>
-            <input type="password" className="input-field" placeholder="Min 6 characters" value={newPw} onChange={e => setNewPw(e.target.value)} required minLength={6} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm *</label>
-            <input type="password" className="input-field" placeholder="Dobara likhein" value={confirm} onChange={e => setConfirm(e.target.value)} required />
-          </div>
-          <div className="flex gap-2 pt-1">
-            <button type="button" onClick={onClose} className="btn-secondary flex-1">Ruko</button>
-            <button type="submit" disabled={loading} className="btn-primary flex-1">{loading ? "Saving..." : "Change"}</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-// ── Dairy Detail View ────────────────────────────────────────────
-
-function DairyDetail({ dairyId, onBack }: { dairyId: string; onBack: () => void }) {
-  const [period, setPeriod] = useState("month");
-  const { data: dairy } = useQuery({ queryKey: ["sa-dairy", dairyId], queryFn: () => superAdminApi.getDairy(dairyId) });
-  const { data: report } = useQuery({ queryKey: ["sa-dairy-report", dairyId, period], queryFn: () => superAdminApi.getDairyReport(dairyId, { period }) });
-
-  if (!dairy) return <div className="p-6 text-center text-gray-500">Loading...</div>;
-
-  return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-lg"><ChevronLeft size={20} /></button>
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">{dairy.name}</h1>
-          <p className="text-sm text-gray-500">{dairy.ownerName} · {dairy.mobile}</p>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
         </div>
-        <span className={`ml-auto text-xs px-2 py-1 rounded-full font-medium ${dairy.isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-          {dairy.isActive ? "Active" : "Inactive"}
-        </span>
-      </div>
 
-      {/* Period selector */}
-      <div className="flex gap-2">
-        {[["week","Is Hafta"],["month","Is Mahine"],["custom","Custom"]].map(([v,l]) => (
-          <button key={v} onClick={() => setPeriod(v)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${period === v ? "bg-brand-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-            {l}
-          </button>
-        ))}
-      </div>
-
-      {report && (
-        <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              { label: "Kul Kisaan", value: report.farmers, color: "bg-blue-50 text-blue-700" },
-              { label: "Doodh", value: `${(report.milk.liters ?? 0).toFixed(1)}L`, color: "bg-teal-50 text-teal-700" },
-              { label: "Kamai", value: `₹${(report.milk.amount ?? 0).toFixed(0)}`, color: "bg-orange-50 text-orange-700" },
-              { label: "Baaki", value: `₹${(report.balance.pending ?? 0).toFixed(0)}`, color: "bg-red-50 text-red-700" },
-            ].map(({ label, value, color }) => (
-              <div key={label} className={`rounded-xl p-3 ${color.split(" ")[0]}`}>
-                <p className="text-xs text-gray-500">{label}</p>
-                <p className={`text-xl font-bold ${color.split(" ")[1]}`}>{value}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: "Entries", value: report.milk.entries },
-              { label: "Avg Fat", value: `${(report.milk.avgFat ?? 0).toFixed(1)}%` },
-              { label: "Avg Rate", value: `₹${(report.milk.avgRate ?? 0).toFixed(1)}/L` },
-            ].map(({ label, value }) => (
-              <div key={label} className="bg-white border border-gray-100 rounded-xl p-3 text-center">
-                <p className="text-xs text-gray-500">{label}</p>
-                <p className="font-bold text-gray-900">{value}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Recent entries */}
-          <div className="bg-white rounded-xl border border-gray-100 p-4">
-            <h3 className="font-semibold text-gray-800 mb-3">Recent Entries</h3>
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {report.recentEntries?.slice(0, 10).map((e: any) => (
-                <div key={e.id} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
-                  <div>
-                    <p className="text-sm font-medium">{e.farmer.name} <span className="text-xs text-gray-400">({e.farmer.code})</span></p>
-                    <p className="text-xs text-gray-500">{format(new Date(e.date), "dd MMM, hh:mm a")} · {e.liters}L · Fat {e.fatPercent}%</p>
-                  </div>
-                  <p className="text-sm font-semibold text-brand-600">₹{e.totalAmount.toFixed(0)}</p>
-                </div>
+        <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+          {/* Mode */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Pricing Mode</p>
+            <div className="grid grid-cols-3 gap-2">
+              {[["fat_only", "📊", "Fat Only"], ["fat_snf", "🧪", "Fat+SNF"], ["fixed", "💰", "Fixed"]].map(([val, icon, label]) => (
+                <button key={val} onClick={() => f("pricingMode", val)}
+                  className={`p-2.5 rounded-xl border-2 text-center transition-all ${form.pricingMode === val ? "border-brand-500 bg-brand-50" : "border-gray-200"}`}>
+                  <div className="text-lg">{icon}</div>
+                  <div className={`text-xs font-semibold mt-1 ${form.pricingMode === val ? "text-brand-700" : "text-gray-600"}`}>{label}</div>
+                </button>
               ))}
             </div>
           </div>
-        </>
-      )}
 
-      {/* Farmers list */}
-      {dairy.farmers?.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
-          <h3 className="font-semibold text-gray-800 mb-3">Registered Farmers ({dairy.farmers.length})</h3>
-          <div className="grid grid-cols-2 gap-2">
-            {dairy.farmers.map((f: any) => (
-              <div key={f.id} className="text-sm p-2 bg-gray-50 rounded-lg">
-                <p className="font-medium text-gray-800">{f.name}</p>
-                <p className="text-xs text-gray-500">{f.code} · {f.village}</p>
+          {/* Fat rate */}
+          {(form.pricingMode === "fat_only" || form.pricingMode === "fat_snf") && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Fat Rate — ₹ per 1% per Liter</label>
+                <input type="number" className="input-field" value={form.fatRate}
+                  onChange={e => f("fatRate", parseFloat(e.target.value))} step="0.01" min="0.01" />
+                <p className="text-xs text-brand-600 mt-1 font-mono">
+                  Fat 5.5% → ₹{(5.5 * form.fatRate).toFixed(2)}/L &nbsp;|&nbsp; Fat 6.5% → ₹{(6.5 * form.fatRate).toFixed(2)}/L
+                </p>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Main SuperAdmin Page ─────────────────────────────────────────
-
-
-function SAChangePasswordModal({ onClose }: { onClose: () => void }) {
-  const [current, setCurrent] = useState("");
-  const [newPw, setNewPw] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newPw !== confirm) { toast.error("Passwords match nahi!"); return; }
-    if (newPw.length < 6) { toast.error("Min 6 characters chahiye"); return; }
-    setLoading(true);
-    try {
-      await authApi.superChangePassword(current, newPw);
-      toast.success("Password change ho gaya! ✅ Dobara login karein.");
-      onClose();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error ?? "Password change nahi hua");
-    } finally { setLoading(false); }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="font-semibold text-gray-900">Apna Password Change Karein</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-4 space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Current Password *</label>
-            <input type="password" className="input-field" placeholder="Purana password"
-              value={current} onChange={e => setCurrent(e.target.value)} required />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Naya Password *</label>
-            <input type="password" className="input-field" placeholder="Min 6 characters"
-              value={newPw} onChange={e => setNewPw(e.target.value)} required minLength={6} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password *</label>
-            <input type="password" className="input-field" placeholder="Dobara likhein"
-              value={confirm} onChange={e => setConfirm(e.target.value)} required />
-          </div>
-          <div className="flex gap-2 pt-1">
-            <button type="button" onClick={onClose} className="btn-secondary flex-1">Ruko</button>
-            <button type="submit" disabled={loading} className="btn-primary flex-1">
-              {loading ? "Saving..." : "Change Karein"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-export default function SuperAdminPage() {
-  const { admin, logout } = useAuth();
-  const navigate = useNavigate();
-  const qc = useQueryClient();
-  const [createModal, setCreateModal] = useState(false);
-  const [ratesModal, setRatesModal] = useState<Dairy | null>(null);
-  const [pwModal, setPwModal] = useState<{ dairy: Dairy; admin: { id: string; username: string; name: string } } | null>(null);
-  const [selectedDairyId, setSelectedDairyId] = useState<string | null>(null);
-  const [showSAPwModal, setShowSAPwModal] = useState(false);
-
-  const { data: stats } = useQuery({ queryKey: ["sa-stats"], queryFn: superAdminApi.stats, refetchInterval: 30000 });
-  const { data: dairies = [], isLoading } = useQuery({ queryKey: ["sa-dairies"], queryFn: superAdminApi.dairies });
-
-  const toggleMutation = useMutation({
-    mutationFn: superAdminApi.toggleDairy,
-    onSuccess: (data) => { qc.invalidateQueries({ queryKey: ["sa-dairies"] }); toast.success(data.message); },
-    onError: () => toast.error("Toggle nahi hua"),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: superAdminApi.deleteDairy,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["sa-dairies"] }); toast.success("Dairy band kar di gayi"); },
-    onError: () => toast.error("Delete nahi hua"),
-  });
-
-  const handleLogout = () => { logout(); navigate("/super/login"); };
-
-  if (selectedDairyId) {
-    return <DairyDetail dairyId={selectedDairyId} onBack={() => setSelectedDairyId(null)} />;
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">🏆</span>
-          <div>
-            <p className="font-bold text-gray-900 text-sm">Super Admin Panel</p>
-            <p className="text-xs text-gray-500">Welcome, {admin?.name}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setShowSAPwModal(true)} className="flex items-center gap-1.5 text-sm text-gray-600 hover:bg-gray-100 px-3 py-1.5 rounded-lg">
-            <KeyRound size={14} /> Password
-          </button>
-          <button onClick={handleLogout} className="flex items-center gap-1.5 text-sm text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg">
-            <LogOut size={14} /> Logout
-          </button>
-        </div>
-      </div>
-
-      <div className="p-4 md:p-6 space-y-5">
-        {/* Stats */}
-        {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              { label: "Kul Dairies", value: stats.totalDairies, sub: `${stats.activeDairies} active`, icon: "🏠" },
-              { label: "Kul Kisaan", value: stats.totalFarmers, icon: "👨‍🌾" },
-              { label: "Aaj Doodh", value: `${(stats.todayMilk ?? 0).toFixed(1)}L`, sub: `${stats.todayEntries} entries`, icon: "🥛" },
-              { label: "Is Mahine", value: `₹${(stats.monthAmount ?? 0).toFixed(0)}`, sub: `${(stats.monthMilk ?? 0).toFixed(0)}L`, icon: "💰" },
-            ].map(({ label, value, sub, icon }) => (
-              <div key={label} className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
-                <div className="text-xl mb-1">{icon}</div>
-                <p className="text-xs text-gray-500">{label}</p>
-                <p className="font-bold text-gray-900 text-lg">{value}</p>
-                {sub && <p className="text-xs text-gray-400">{sub}</p>}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Dairies */}
-        <div className="flex items-center justify-between">
-          <h2 className="font-bold text-gray-900 text-lg">Registered Dairies ({dairies.length})</h2>
-          <button onClick={() => setCreateModal(true)} className="btn-primary flex items-center gap-2 text-sm">
-            <Plus size={15} /> Naya Dairy
-          </button>
-        </div>
-
-        {isLoading ? <div className="text-center py-10 text-gray-500">Loading...</div>
-          : dairies.length === 0 ? (
-            <div className="bg-white rounded-xl border p-10 text-center">
-              <div className="text-4xl mb-2">🏠</div>
-              <p className="text-gray-500 mb-3">Koi dairy nahi hai abhi</p>
-              <button onClick={() => setCreateModal(true)} className="btn-primary">Pehli Dairy Banao</button>
+              {form.pricingMode === "fat_snf" && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">SNF Rate — ₹ per 1% per Liter</label>
+                  <input type="number" className="input-field" value={form.snfRate}
+                    onChange={e => f("snfRate", parseFloat(e.target.value))} step="0.01" />
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-2">
-              {dairies.map((d: Dairy) => (
-                <div key={d.id} className={`bg-white rounded-xl border p-4 shadow-sm transition-all ${!d.isActive ? "opacity-60 border-red-200 bg-red-50/30" : "border-gray-100"}`}>
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-semibold text-gray-900">{d.name}</p>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${d.isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                          {d.isActive ? "Active" : "Inactive"}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-0.5">{d.ownerName} · {d.mobile}</p>
-                    </div>
-                    <div className="flex gap-1 shrink-0 ml-2">
-                      <button onClick={() => setSelectedDairyId(d.id)} className="p-1.5 hover:bg-blue-50 rounded-lg text-blue-500" title="Details dekhein">
-                        <Eye size={14} />
-                      </button>
-                      <button onClick={() => setRatesModal(d)} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500" title="Rates">
-                        <Settings size={14} />
-                      </button>
-                      {d.admins[0] && (
-                        <button onClick={() => setPwModal({ dairy: d, admin: d.admins[0] })} className="p-1.5 hover:bg-yellow-50 rounded-lg text-yellow-600" title="Password change">
-                          <KeyRound size={14} />
-                        </button>
-                      )}
-                      <button onClick={() => { if (confirm(`${d.name} — access ${d.isActive ? "band" : "chalu"} karein?`)) toggleMutation.mutate(d.id); }}
-                        className={`p-1.5 rounded-lg ${d.isActive ? "hover:bg-red-50 text-red-500" : "hover:bg-green-50 text-green-500"}`} title="Toggle">
-                        <Power size={14} />
-                      </button>
-                      <button onClick={() => { if (confirm(`"${d.name}" permanently band karein? Data safe rahega.`)) deleteMutation.mutate(d.id); }}
-                        className="p-1.5 hover:bg-red-50 rounded-lg text-red-400" title="Delete">
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
+          )}
 
-                  {/* Stats row */}
-                  <div className="flex gap-4 text-xs text-gray-500 mb-2">
-                    <span className="flex items-center gap-1"><Users size={11} /> {d._count.farmers} farmers</span>
-                    <span className="flex items-center gap-1"><Droplets size={11} /> {d._count.milkEntries} entries</span>
-                    <span className="flex items-center gap-1"><IndianRupee size={11} /> {d._count.payments} payments</span>
-                  </div>
-
-                  {/* Admin info */}
-                  {d.admins[0] && (
-                    <div className="bg-gray-50 rounded-lg px-2 py-1.5 flex items-center justify-between">
-                      <span className="text-xs text-gray-500">Admin: <span className="font-mono font-medium text-gray-700">{d.admins[0].username}</span></span>
-                      {d.rateConfig && (
-                        <span className="text-xs text-gray-400">Fat:₹{d.rateConfig.fatRatePerKg}/kg · Min:₹{d.rateConfig.minRatePerLiter}/L</span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Created date */}
-                  <p className="text-xs text-gray-400 mt-1">Added: {format(new Date(d.createdAt), "dd MMM yyyy")}</p>
+          {/* Fixed rate */}
+          {form.pricingMode === "fixed" && (
+            <div className="grid grid-cols-2 gap-3">
+              {[["🐃 Buffalo ₹/L", "buffaloFixedRate"], ["🐄 Cow ₹/L", "cowFixedRate"]].map(([label, key]) => (
+                <div key={key as string}>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+                  <input type="number" className="input-field" value={(form as any)[key as string]}
+                    onChange={e => f(key as string, parseFloat(e.target.value))} step="1" />
                 </div>
               ))}
             </div>
           )}
+
+          {/* Min rate */}
+          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+            <div>
+              <p className="text-sm font-medium text-gray-700">Minimum Rate Guarantee</p>
+              <p className="text-xs text-gray-400">Calculated rate se kam nahi milega</p>
+            </div>
+            <button onClick={() => f("useMinRate", !form.useMinRate)}
+              className={`relative w-11 h-6 rounded-full transition-colors ${form.useMinRate ? "bg-brand-500" : "bg-gray-300"}`}>
+              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${form.useMinRate ? "left-6" : "left-1"}`} />
+            </button>
+          </div>
+          {form.useMinRate && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Min ₹/Liter</label>
+              <input type="number" className="input-field" value={form.minRatePerLiter}
+                onChange={e => f("minRatePerLiter", parseFloat(e.target.value))} step="1" />
+            </div>
+          )}
+
+          {/* Live preview */}
+          <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
+            <p className="text-xs font-semibold text-gray-600 mb-2">Preview — Fat 6%, 10L</p>
+            <div className="grid grid-cols-2 gap-2">
+              {[["🐃 Buffalo", "BUFFALO"], ["🐄 Cow", "COW"]].map(([label, mt]) => (
+                <div key={mt} className="bg-white rounded-lg p-2 text-center">
+                  <p className="text-xs text-gray-500">{label}</p>
+                  <p className="text-lg font-bold text-brand-600">₹{getRate(mt).toFixed(2)}/L</p>
+                  <p className="text-xs text-gray-500">= ₹{(getRate(mt) * 10).toFixed(0)} total</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-2 p-4 border-t">
+          <button onClick={onClose} className="btn-secondary flex-1">Ruko</button>
+          <button onClick={() => mutation.mutate(form)} disabled={mutation.isPending} className="btn-primary flex-1">
+            {mutation.isPending ? "Saving..." : "Rate Update Karein"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Add/Edit Dairy Modal ────────────────────────────────────────
+function DairyModal({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const [form, setForm] = useState({ name: "", ownerName: "", mobile: "", address: "", adminUsername: "", adminPassword: "" });
+  const mutation = useMutation({
+    mutationFn: (d: any) => superAdminApi.createDairy(d),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["sa-dairies"] }); qc.invalidateQueries({ queryKey: ["sa-stats"] }); toast.success("Naya dairy add ho gaya! 🎉"); onClose(); },
+    onError: (err: any) => toast.error(err.response?.data?.error ?? "Error"),
+  });
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md my-4">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h2 className="font-bold text-gray-900">Naya Dairy Add Karein</h2>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
+        </div>
+        <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+          <p className="text-xs font-semibold text-gray-400 uppercase">Dairy Details</p>
+          {[["Dairy Name *", "name", "text"], ["Owner Name *", "ownerName", "text"], ["Mobile *", "mobile", "tel"], ["Address", "address", "text"]].map(([label, key, type]) => (
+            <div key={key as string}>
+              <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+              <input type={type as string} className="input-field" value={(form as any)[key as string]}
+                onChange={e => setForm(p => ({ ...p, [key as string]: e.target.value }))} />
+            </div>
+          ))}
+          <p className="text-xs font-semibold text-gray-400 uppercase pt-2">Admin Login Details</p>
+          {[["Username *", "adminUsername", "text"], ["Password *", "adminPassword", "password"]].map(([label, key, type]) => (
+            <div key={key as string}>
+              <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+              <input type={type as string} className="input-field" value={(form as any)[key as string]}
+                onChange={e => setForm(p => ({ ...p, [key as string]: e.target.value }))} />
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2 p-4 border-t">
+          <button onClick={onClose} className="btn-secondary flex-1">Ruko</button>
+          <button onClick={() => mutation.mutate(form)} disabled={mutation.isPending} className="btn-primary flex-1">
+            {mutation.isPending ? "Creating..." : "Dairy Banao"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Change Password Modal ───────────────────────────────────────
+function PasswordModal({ dairy, admin, onClose }: { dairy: any; admin: any; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [pw, setPw] = useState("");
+  const mutation = useMutation({
+    mutationFn: () => superAdminApi.changeAdminPassword(dairy.id, admin.id, pw),
+    onSuccess: () => { toast.success("Password change ho gaya! ✅"); onClose(); },
+    onError: (err: any) => toast.error(err.response?.data?.error ?? "Error"),
+  });
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="flex items-center justify-between p-4 border-b">
+          <div>
+            <h2 className="font-bold text-gray-900">Password Change</h2>
+            <p className="text-xs text-gray-500">{admin.username} — {dairy.name}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
+        </div>
+        <div className="p-4 space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Naya Password</label>
+            <input type="password" className="input-field" value={pw} onChange={e => setPw(e.target.value)}
+              placeholder="Min 6 characters" minLength={6} />
+          </div>
+        </div>
+        <div className="flex gap-2 p-4 border-t">
+          <button onClick={onClose} className="btn-secondary flex-1">Ruko</button>
+          <button onClick={() => mutation.mutate()} disabled={mutation.isPending || pw.length < 6} className="btn-primary flex-1">
+            {mutation.isPending ? "..." : "Change Karein"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── SA Password Modal ───────────────────────────────────────────
+function SAPasswordModal({ onClose }: { onClose: () => void }) {
+  const [current, setCurrent] = useState(""), [newPw, setNewPw] = useState(""), [confirm, setConfirm] = useState(""), [loading, setLoading] = useState(false);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPw !== confirm) { toast.error("Passwords match nahi!"); return; }
+    setLoading(true);
+    try { await authApi.superChangePassword(current, newPw); toast.success("Password change ho gaya! ✅"); onClose(); }
+    catch (err: any) { toast.error(err.response?.data?.error ?? "Error"); }
+    finally { setLoading(false); }
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h2 className="font-bold text-gray-900">Super Admin Password</h2>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-4 space-y-3">
+          {[["Current Password", current, setCurrent], ["Naya Password", newPw, setNewPw], ["Confirm", confirm, setConfirm]].map(([label, val, setter]: any) => (
+            <div key={label}><label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+              <input type="password" className="input-field" value={val} onChange={e => setter(e.target.value)} required /></div>
+          ))}
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={onClose} className="btn-secondary flex-1">Ruko</button>
+            <button type="submit" disabled={loading} className="btn-primary flex-1">{loading ? "..." : "Change"}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Dairy Card ──────────────────────────────────────────────────
+function DairyCard({ dairy, onRate, onPassword, onToggle, onDelete, onView }: any) {
+  const [expanded, setExpanded] = useState(false);
+  const admin = dairy.admins?.[0];
+  const rc = dairy.rateConfig;
+  const isActive = dairy.isActive;
+
+  return (
+    <div className={`bg-white rounded-2xl border-2 transition-all ${isActive ? "border-gray-100" : "border-red-100 opacity-80"}`}>
+      {/* Header */}
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-bold text-gray-900 text-base">{dairy.name}</h3>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
+                {isActive ? "Active" : "Band"}
+              </span>
+            </div>
+            <p className="text-sm text-gray-500 mt-0.5">{dairy.ownerName} · {dairy.mobile}</p>
+          </div>
+          <button onClick={() => setExpanded(v => !v)} className="p-1.5 hover:bg-gray-100 rounded-lg flex-shrink-0">
+            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+        </div>
+
+        {/* Stats row */}
+        <div className="grid grid-cols-3 gap-2 mt-3">
+          <div className="text-center bg-gray-50 rounded-lg py-2">
+            <p className="text-lg font-bold text-gray-900">{dairy._count?.farmers ?? 0}</p>
+            <p className="text-xs text-gray-400">Kisaan</p>
+          </div>
+          <div className="text-center bg-orange-50 rounded-lg py-2">
+            <p className="text-lg font-bold text-brand-600">{dairy._count?.milkEntries ?? 0}</p>
+            <p className="text-xs text-gray-400">Entries</p>
+          </div>
+          <div className="text-center bg-green-50 rounded-lg py-2">
+            <p className="text-lg font-bold text-green-600">{dairy._count?.payments ?? 0}</p>
+            <p className="text-xs text-gray-400">Payments</p>
+          </div>
+        </div>
       </div>
 
-      {createModal && <CreateDairyModal onClose={() => setCreateModal(false)} />}
-      {ratesModal && <RatesModal dairy={ratesModal} onClose={() => setRatesModal(null)} />}
-      {pwModal && <ChangePasswordModal dairy={pwModal.dairy} admin={pwModal.admin} onClose={() => setPwModal(null)} />}
-      {showSAPwModal && <SAChangePasswordModal onClose={() => setShowSAPwModal(false)} />}
+      {/* Expanded details */}
+      {expanded && (
+        <div className="px-4 pb-3 border-t border-gray-50 pt-3 space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-500">Admin</span>
+            <span className="font-mono font-medium text-gray-800">{admin?.username}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-500">Rate Mode</span>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${rc?.pricingMode === "fat_only" ? "bg-blue-50 text-blue-700" :
+                rc?.pricingMode === "fat_snf" ? "bg-purple-50 text-purple-700" :
+                  "bg-green-50 text-green-700"
+              }`}>
+              {rc?.pricingMode === "fat_only" ? "📊 Fat Only" : rc?.pricingMode === "fat_snf" ? "🧪 Fat+SNF" : "💰 Fixed"}
+            </span>
+          </div>
+          {rc?.pricingMode !== "fixed" && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500">Fat Rate</span>
+              <span className="font-medium text-gray-800">₹{rc?.fatRate ?? "?"}/1%/L</span>
+            </div>
+          )}
+          {rc?.pricingMode === "fixed" && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500">Fixed Rate</span>
+              <span className="font-medium text-gray-800">🐃₹{rc?.buffaloFixedRate} · 🐄₹{rc?.cowFixedRate}</span>
+            </div>
+          )}
+          {rc?.useMinRate && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500">Min Rate</span>
+              <span className="font-medium text-gray-800">₹{rc?.minRatePerLiter}/L</span>
+            </div>
+          )}
+          <p className="text-xs text-gray-400">Added: {new Date(dairy.createdAt).toLocaleDateString("en-IN")}</p>
+        </div>
+      )}
+
+      {/* Action buttons */}
+      <div className="px-4 pb-4 flex gap-2 flex-wrap">
+        <button onClick={() => onView(dairy)} title="View Report"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100">
+          <Eye size={13} /> Report
+        </button>
+        <button onClick={() => onRate(dairy)} title="Rate Settings"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-brand-700 rounded-lg text-xs font-medium hover:bg-orange-100">
+          <Settings size={13} /> Rate
+        </button>
+        {admin && (
+          <button onClick={() => onPassword(dairy, admin)} title="Change Password"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-100">
+            <Key size={13} /> Password
+          </button>
+        )}
+        <button onClick={() => onToggle(dairy)} title="Toggle Access"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${isActive ? "bg-yellow-50 text-yellow-700 hover:bg-yellow-100" : "bg-green-50 text-green-700 hover:bg-green-100"}`}>
+          <Power size={13} /> {isActive ? "Band Karo" : "Chalu Karo"}
+        </button>
+        <button onClick={() => onDelete(dairy)} title="Delete"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100">
+          <Trash2 size={13} /> Delete
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Super Admin Page ───────────────────────────────────────
+export default function SuperAdminPage() {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+
+  const [showAddDairy, setShowAddDairy] = useState(false);
+  const [showSAPw, setShowSAPw] = useState(false);
+  const [rateModal, setRateModal] = useState<any>(null);
+  const [pwModal, setPwModal] = useState<{ dairy: any; admin: any } | null>(null);
+  const [viewModal, setViewModal] = useState<any>(null);
+
+  const { data: stats } = useQuery({ queryKey: ["sa-stats"], queryFn: superAdminApi.stats });
+  const { data: dairies = [], isLoading } = useQuery({ queryKey: ["sa-dairies"], queryFn: superAdminApi.dairies });
+
+  const toggleMutation = useMutation({
+    mutationFn: (id: string) => superAdminApi.toggleDairy(id),
+    onSuccess: (data) => { qc.invalidateQueries({ queryKey: ["sa-dairies"] }); toast.success(data.message); },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => superAdminApi.deleteDairy(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["sa-dairies"] }); qc.invalidateQueries({ queryKey: ["sa-stats"] }); toast.success("Dairy band kar di gayi"); },
+  });
+
+  const handleLogout = () => { logout(); navigate("/super/login"); };
+
+  const statCards = [
+    { label: "Kul Dairies", value: stats?.totalDairies ?? 0, sub: `${stats?.activeDairies ?? 0} active`, icon: "🏠", color: "bg-blue-50 text-blue-700" },
+    { label: "Kul Kisaan", value: stats?.totalFarmers ?? 0, icon: "👨‍🌾", color: "bg-green-50 text-green-700" },
+    { label: "Aaj ka Doodh", value: `${(stats?.todayMilk ?? 0).toFixed(1)}L`, sub: `${stats?.todayEntries ?? 0} entries`, icon: "🥛", color: "bg-orange-50 text-orange-700" },
+    { label: "Is Mahine", value: `₹${Math.round(stats?.monthAmount ?? 0).toLocaleString("en-IN")}`, sub: `${(stats?.monthMilk ?? 0).toFixed(1)}L`, icon: "💰", color: "bg-purple-50 text-purple-700" },
+  ];
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-100 sticky top-0 z-30 shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-brand-600 rounded-full flex items-center justify-center text-xl">🏆</div>
+            <div>
+              <p className="font-bold text-gray-900 text-sm">Super Admin Panel</p>
+              <p className="text-xs text-brand-600">Smart Dairy Solution</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => qc.invalidateQueries()} className="p-2 hover:bg-gray-100 rounded-xl" title="Refresh">
+              <RefreshCw size={15} className="text-gray-500" />
+            </button>
+            <button onClick={() => setShowSAPw(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-xl text-xs font-medium text-gray-700">
+              <KeyRound size={13} /> Password
+            </button>
+            <button onClick={handleLogout}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 rounded-xl text-xs font-medium text-red-600">
+              <LogOut size={13} /> Logout
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {statCards.map(({ label, value, sub, icon, color }) => (
+            <div key={label} className={`${color.split(" ")[0]} rounded-2xl p-4 border border-gray-100`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-gray-500">{label}</span>
+                <span className="text-xl">{icon}</span>
+              </div>
+              <p className={`text-2xl font-bold ${color.split(" ")[1]}`}>{value}</p>
+              {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+            </div>
+          ))}
+        </div>
+
+        {/* Dairies */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-gray-900">
+              Registered Dairies ({dairies.length})
+            </h2>
+            <button onClick={() => setShowAddDairy(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold transition-colors">
+              <Plus size={16} /> Naya Dairy
+            </button>
+          </div>
+
+          {isLoading ? (
+            <div className="text-center py-12 text-gray-400">Loading...</div>
+          ) : dairies.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <p className="text-4xl mb-2">🏠</p>
+              <p>Koi dairy nahi hai. Pehla dairy banao!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {dairies.map((dairy: any) => (
+                <DairyCard key={dairy.id} dairy={dairy}
+                  onRate={(d: any) => setRateModal(d)}
+                  onPassword={(d: any, a: any) => setPwModal({ dairy: d, admin: a })}
+                  onToggle={(d: any) => {
+                    if (confirm(`${d.name} ko ${d.isActive ? "band" : "chalu"} karna chahte ho?`)) toggleMutation.mutate(d.id);
+                  }}
+                  onDelete={(d: any) => {
+                    if (confirm(`${d.name} delete karna chahte ho? Data safe rahega.`)) deleteMutation.mutate(d.id);
+                  }}
+                  onView={(d: any) => setViewModal(d)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modals */}
+      {showAddDairy && <DairyModal onClose={() => setShowAddDairy(false)} />}
+      {showSAPw && <SAPasswordModal onClose={() => setShowSAPw(false)} />}
+      {rateModal && <RateModal dairy={rateModal} onClose={() => setRateModal(null)} />}
+      {pwModal && <PasswordModal dairy={pwModal.dairy} admin={pwModal.admin} onClose={() => setPwModal(null)} />}
     </div>
   );
 }
