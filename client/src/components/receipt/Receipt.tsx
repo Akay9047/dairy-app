@@ -2,13 +2,11 @@ import { X, Printer, Download, MessageCircle, Phone } from "lucide-react";
 import { format } from "date-fns";
 import { notifyApi } from "../../lib/api";
 import toast from "react-hot-toast";
-import jsPDF from "jspdf";
 
 interface ReceiptEntry {
   id: string; date: string; shift: "MORNING" | "EVENING";
   milkType?: string; liters: number; fatPercent: number;
-  snfPercent?: number; fatKg?: number; snfKg?: number;
-  fatAmount?: number; snfAmount?: number; fatRate?: number; snfRate?: number;
+  snfPercent?: number; fatAmount?: number; snfAmount?: number;
   ratePerLiter: number; totalAmount: number;
   farmer: { name: string; mobile: string; code: string; village: string };
 }
@@ -16,208 +14,216 @@ interface ReceiptEntry {
 const n = (val: number | undefined, d = 2) => (val ?? 0).toFixed(d);
 
 export default function Receipt({ entry, onClose }: { entry: ReceiptEntry; onClose: () => void }) {
-  const fatAmt = entry.fatAmount ?? entry.fatRate ?? 0;
-  const snfAmt = entry.snfAmount ?? entry.snfRate ?? 0;
-  const milkIcon = entry.milkType === "BUFFALO" ? "🐃" : entry.milkType === "COW" ? "🐄" : "🐃🐄";
+  const milkLabel = entry.milkType === "BUFFALO" ? "Buffalo (Bhains)"
+    : entry.milkType === "COW" ? "Cow (Gaay)" : "Mixed";
 
-  const handleDownloadPdf = () => {
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [80, 145] });
+  const handlePrint = () => window.print();
+
+  const handleDownloadPdf = async () => {
+    const { default: jsPDF } = await import("jspdf");
+    // 80mm thermal width = ~227px at 72dpi, use 80mm x 200mm
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [80, 180] });
     const pw = 80;
-    let y = 8;
+    let y = 6;
+
+    const center = (txt: string, size: number, bold = false) => {
+      doc.setFontSize(size);
+      doc.setFont("helvetica", bold ? "bold" : "normal");
+      doc.text(txt, pw / 2, y, { align: "center" });
+      y += size * 0.45;
+    };
+
+    const row = (label: string, value: string, size = 8) => {
+      doc.setFontSize(size);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(80);
+      doc.text(label, 4, y);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0);
+      doc.text(value, pw - 4, y, { align: "right" });
+      y += size * 0.42;
+    };
+
+    const dashes = () => {
+      doc.setDrawColor(180);
+      doc.setLineDashPattern([1, 1], 0);
+      doc.line(4, y, pw - 4, y);
+      y += 3;
+    };
 
     // Header
     doc.setFillColor(234, 88, 12);
-    doc.rect(0, 0, pw, 20, "F");
+    doc.rect(0, 0, pw, 16, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(10); doc.setFont("helvetica", "bold");
-    doc.text("SMART DAIRY SOLUTION", pw / 2, 8, { align: "center" });
+    doc.text("SMART DAIRY SOLUTION", pw / 2, 7, { align: "center" });
     doc.setFontSize(7); doc.setFont("helvetica", "normal");
-    doc.text("Aapki Apni Digital Dairy", pw / 2, 13, { align: "center" });
-    doc.text("Rajasthan Dairy Management", pw / 2, 18, { align: "center" });
-    doc.setTextColor(0, 0, 0);
-    y = 25;
+    doc.text("Aapki Apni Digital Dairy", pw / 2, 11, { align: "center" });
+    doc.text("Rajasthan", pw / 2, 14.5, { align: "center" });
+    doc.setTextColor(0);
+    y = 20;
 
-    // Dashed line
-    doc.setLineDashPattern([1, 1], 0);
-    doc.setDrawColor(180); doc.line(5, y, pw - 5, y); y += 4;
-
-    // Info rows
-    const row = (label: string, value: string) => {
-      doc.setFontSize(7.5); doc.setFont("helvetica", "normal"); doc.setTextColor(100);
-      doc.text(label, 6, y);
-      doc.setFont("helvetica", "bold"); doc.setTextColor(0);
-      doc.text(value, pw - 6, y, { align: "right" });
-      y += 5;
-    };
-
+    dashes();
     row("Date", format(new Date(entry.date), "dd/MM/yyyy"));
     row("Time", format(new Date(entry.date), "hh:mm a"));
-    row("Shift", entry.shift === "MORNING" ? "Subah (Morning)" : "Shaam (Evening)");
-    row("Milk Type", entry.milkType === "BUFFALO" ? "Buffalo (Bhains)" : entry.milkType === "COW" ? "Cow (Gaay)" : "Mixed");
-    y += 1;
-    doc.setLineDashPattern([1, 1], 0);
-    doc.setDrawColor(180); doc.line(5, y, pw - 5, y); y += 4;
-
+    row("Shift", entry.shift === "MORNING" ? "Subah" : "Shaam");
+    row("Milk", milkLabel);
+    dashes();
     row("Farmer", entry.farmer.name);
     row("Code", entry.farmer.code);
     row("Mobile", entry.farmer.mobile);
     row("Village", entry.farmer.village);
-    y += 1;
-    doc.line(5, y, pw - 5, y); y += 4;
-
-    row("Doodh (Liters)", `${n(entry.liters)} L`);
+    dashes();
+    row("Doodh", `${n(entry.liters)} L`);
     row("Fat %", `${n(entry.fatPercent, 1)} %`);
-    row("SNF %", `${n(entry.snfPercent)} %`);
-    row("Fat Amount", `Rs ${n(fatAmt)}`);
-    row("SNF Amount", `Rs ${n(snfAmt)}`);
-    row("Rate / Liter", `Rs ${n(entry.ratePerLiter)}`);
+    if (entry.snfPercent && entry.snfPercent > 0) row("SNF %", `${n(entry.snfPercent)} %`);
+    if (entry.fatAmount && entry.fatAmount > 0) row("Fat Amt", `Rs ${n(entry.fatAmount)}`);
+    if (entry.snfAmount && entry.snfAmount > 0) row("SNF Amt", `Rs ${n(entry.snfAmount)}`);
+    row("Rate/L", `Rs ${n(entry.ratePerLiter)}`);
+    dashes();
 
-    y += 1;
+    // Total — big
     doc.setLineDashPattern([], 0);
-    doc.setDrawColor(234, 88, 12); doc.setLineWidth(0.5);
-    doc.line(5, y, pw - 5, y); y += 2;
-
-    // Total
     doc.setFillColor(255, 247, 237);
-    doc.rect(5, y, pw - 10, 12, "F");
+    doc.rect(4, y - 1, pw - 8, 14, "F");
     doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(100);
-    doc.text("Kul Rakam (Total)", 8, y + 5);
-    doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(234, 88, 12);
-    doc.text(`Rs ${n(entry.totalAmount)}`, pw - 8, y + 8, { align: "right" });
-    doc.setTextColor(0, 0, 0);
-    y += 16;
+    doc.text("Kul Rakam (Total)", pw / 2, y + 4, { align: "center" });
+    doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.setTextColor(234, 88, 12);
+    doc.text(`Rs ${n(entry.totalAmount)}`, pw / 2, y + 11, { align: "center" });
+    doc.setTextColor(0);
+    y += 18;
 
-    doc.setDrawColor(234, 88, 12);
-    doc.line(5, y, pw - 5, y); y += 5;
+    dashes();
+    doc.setFontSize(7); doc.setFont("helvetica", "normal"); doc.setTextColor(120);
+    doc.text("🙏 Aapke vishwas ka shukriya!", pw / 2, y, { align: "center" }); y += 4;
+    doc.text("Smart Dairy Solution", pw / 2, y, { align: "center" });
 
-    // Footer
-    doc.setFontSize(7); doc.setFont("helvetica", "italic"); doc.setTextColor(120);
-    doc.text("Aapke vishwas ka shukriya!", pw / 2, y, { align: "center" }); y += 4;
-    doc.text("Thank you for your trust!", pw / 2, y, { align: "center" }); y += 5;
-    doc.setFontSize(6); doc.setTextColor(160);
-    doc.text("Smart Dairy Solution — dairy-app-rouge.vercel.app", pw / 2, y, { align: "center" });
-
-    doc.save(`receipt-${entry.farmer.code}-${format(new Date(entry.date), "ddMMyyyy-HHmm")}.pdf`);
+    doc.save(`receipt-${entry.farmer.code}-${format(new Date(entry.date), "ddMMyyyyHHmm")}.pdf`);
     toast.success("PDF download ho gaya! ✅");
   };
 
   const handleWhatsApp = async () => {
     try {
       const result = await notifyApi.whatsapp(entry.id);
-      if (result.configured === false && result.whatsappUrl) {
-        window.open(result.whatsappUrl, "_blank");
-        toast.success("WhatsApp khul raha hai! ✅");
-      } else {
-        toast.success("WhatsApp message bhej diya! ✅");
-      }
-    } catch (err: any) { toast.error(err.response?.data?.error ?? "WhatsApp nahi gaya"); }
+      if (result.whatsappUrl) { window.open(result.whatsappUrl, "_blank"); toast.success("WhatsApp khul raha hai! ✅"); }
+      else toast.success("Message bhej diya! ✅");
+    } catch (err: any) { toast.error(err.response?.data?.error ?? "Error"); }
   };
 
   const handleSms = async () => {
     try {
       const result = await notifyApi.sms(entry.id);
-      if (result.configured === false) {
-        toast(`SMS: ${result.previewMessage}`, { duration: 5000, icon: "📱" });
-      } else {
-        toast.success("SMS bhej diya! ✅");
-      }
-    } catch (err: any) { toast.error(err.response?.data?.error ?? "SMS nahi gaya"); }
+      toast(result.previewMessage ?? "SMS bhej diya!", { icon: "📱", duration: 5000 });
+    } catch (err: any) { toast.error(err.response?.data?.error ?? "Error"); }
   };
 
   return (
     <>
-      {/* Print CSS */}
+      {/* Thermal print CSS — 80mm width */}
       <style>{`
         @media print {
-          body * { visibility: hidden !important; }
-          .print-receipt, .print-receipt * { visibility: visible !important; }
-          .print-receipt { position: fixed !important; left: 0 !important; top: 0 !important; width: 80mm !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; border-radius: 0 !important; }
+          * { visibility: hidden !important; margin: 0 !important; padding: 0 !important; }
+          .thermal-receipt, .thermal-receipt * { visibility: visible !important; }
+          .thermal-receipt {
+            position: fixed !important;
+            top: 0 !important; left: 0 !important;
+            width: 80mm !important;
+            max-width: 80mm !important;
+            font-size: 11px !important;
+            font-family: 'Courier New', monospace !important;
+            background: white !important;
+            padding: 4mm !important;
+          }
           .no-print { display: none !important; }
+          @page { margin: 0; size: 80mm auto; }
         }
       `}</style>
 
       <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-        <div className="print-receipt bg-white w-full sm:w-80 sm:rounded-2xl shadow-xl max-h-screen overflow-y-auto">
-          {/* Header bar */}
-          <div className="no-print flex items-center justify-between px-4 py-3 border-b sticky top-0 bg-white z-10">
-            <h2 className="font-semibold text-gray-900">Receipt / Rasid</h2>
+        <div className="bg-white w-full sm:w-96 sm:rounded-2xl shadow-2xl max-h-[95vh] flex flex-col">
+
+          {/* Modal Header */}
+          <div className="no-print flex items-center justify-between px-4 py-3 border-b flex-shrink-0">
+            <h2 className="font-bold text-gray-900">Receipt / Rasid</h2>
             <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
           </div>
 
-          {/* Receipt Content */}
-          <div className="font-mono text-xs">
-            {/* Orange header */}
-            <div className="bg-brand-600 text-white text-center py-3 px-4">
-              <p className="font-bold text-sm">🐄 SMART DAIRY SOLUTION</p>
+          {/* Thermal Receipt Preview */}
+          <div className="thermal-receipt overflow-y-auto flex-1" style={{ fontFamily: "'Courier New', monospace" }}>
+            {/* Orange Header */}
+            <div className="bg-brand-600 text-white text-center py-3">
+              <p className="font-bold text-sm tracking-wide">🐄 SMART DAIRY SOLUTION</p>
               <p className="text-xs opacity-90">Aapki Apni Digital Dairy</p>
-              <p className="text-xs opacity-75">Rajasthan Dairy Management</p>
+              <p className="text-xs opacity-75">Rajasthan</p>
             </div>
 
-            <div className="p-4 space-y-0.5">
-              {/* Date/Time/Shift */}
-              <div className="border-b border-dashed border-gray-300 pb-2 mb-2">
+            <div className="px-3 py-2 text-xs" style={{ fontFamily: "'Courier New', monospace" }}>
+              {/* Date/Shift */}
+              <div className="border-b border-dashed border-gray-300 pb-2 mb-2 space-y-0.5">
                 {[
                   ["Date", format(new Date(entry.date), "dd/MM/yyyy")],
                   ["Time", format(new Date(entry.date), "hh:mm a")],
                   ["Shift", entry.shift === "MORNING" ? "☀️ Subah" : "🌙 Shaam"],
-                  ["Milk", `${milkIcon} ${entry.milkType === "BUFFALO" ? "Buffalo" : entry.milkType === "COW" ? "Cow" : "Mixed"}`],
+                  ["Milk", milkLabel],
                 ].map(([l, v]) => (
-                  <div key={l} className="flex justify-between py-0.5">
+                  <div key={l} className="flex justify-between">
                     <span className="text-gray-500">{l}</span>
-                    <span className="font-medium">{v}</span>
+                    <span className="font-semibold">{v}</span>
                   </div>
                 ))}
               </div>
 
-              {/* Farmer info */}
-              <div className="border-b border-dashed border-gray-300 pb-2 mb-2">
+              {/* Farmer */}
+              <div className="border-b border-dashed border-gray-300 pb-2 mb-2 space-y-0.5">
                 {[
                   ["Farmer", entry.farmer.name],
                   ["Code", entry.farmer.code],
                   ["Mobile", entry.farmer.mobile],
                   ["Village", entry.farmer.village],
                 ].map(([l, v]) => (
-                  <div key={l} className="flex justify-between py-0.5">
+                  <div key={l} className="flex justify-between">
                     <span className="text-gray-500">{l}</span>
-                    <span className="font-medium text-right max-w-[60%]">{v}</span>
+                    <span className="font-semibold text-right max-w-[55%] truncate">{v}</span>
                   </div>
                 ))}
               </div>
 
-              {/* Milk details */}
-              <div className="border-b border-dashed border-gray-300 pb-2 mb-2">
+              {/* Milk Details */}
+              <div className="border-b border-dashed border-gray-300 pb-2 mb-2 space-y-0.5">
                 {[
                   ["Doodh", `${n(entry.liters)} Liter`],
-                  ["Fat %", `${n(entry.fatPercent, 1)}%`],
-                  ["SNF %", `${n(entry.snfPercent)}%`],
-                  ["Fat Amount", `₹${n(fatAmt)}`],
-                  ["SNF Amount", `₹${n(snfAmt)}`],
+                  ["Fat %", `${n(entry.fatPercent, 1)} %`],
+                  ...(entry.snfPercent && entry.snfPercent > 0 ? [["SNF %", `${n(entry.snfPercent)} %`]] : []),
+                  ...(entry.fatAmount && entry.fatAmount > 0 ? [["Fat Amt", `₹${n(entry.fatAmount)}`]] : []),
+                  ...(entry.snfAmount && entry.snfAmount > 0 ? [["SNF Amt", `₹${n(entry.snfAmount)}`]] : []),
                   ["Rate/Liter", `₹${n(entry.ratePerLiter)}`],
                 ].map(([l, v]) => (
-                  <div key={l} className="flex justify-between py-0.5">
+                  <div key={l as string} className="flex justify-between">
                     <span className="text-gray-500">{l}</span>
-                    <span className="font-medium">{v}</span>
+                    <span className="font-semibold">{v}</span>
                   </div>
                 ))}
               </div>
 
-              {/* Total */}
-              <div className="bg-orange-50 rounded-xl p-3 text-center">
+              {/* TOTAL */}
+              <div className="bg-orange-50 rounded-lg p-2 text-center border border-orange-100 mb-2">
                 <p className="text-xs text-gray-500 mb-0.5">Kul Rakam (Total)</p>
                 <p className="text-2xl font-bold text-brand-600">₹{n(entry.totalAmount)}</p>
               </div>
 
-              <div className="text-center pt-2 pb-1">
-                <p className="text-gray-500">🙏 Aapke vishwas ka shukriya!</p>
-                <p className="text-gray-400 text-xs">Thank you for your trust!</p>
+              <div className="text-center text-gray-400 text-xs space-y-0.5 pb-1">
+                <p>🙏 Aapke vishwas ka shukriya!</p>
+                <p>Thank you for your trust!</p>
+                <p className="text-gray-300">━━━━━━━━━━━━━━━━━━━━</p>
+                <p>Smart Dairy Solution</p>
               </div>
             </div>
           </div>
 
-          {/* Action buttons */}
-          <div className="no-print p-3 border-t grid grid-cols-2 gap-2 sticky bottom-0 bg-white">
-            <button onClick={() => window.print()}
-              className="flex items-center justify-center gap-1.5 py-2.5 border border-gray-300 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">
+          {/* Action Buttons */}
+          <div className="no-print p-3 border-t grid grid-cols-2 gap-2 flex-shrink-0">
+            <button onClick={handlePrint}
+              className="flex items-center justify-center gap-1.5 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">
               <Printer size={15} /> Print
             </button>
             <button onClick={handleDownloadPdf}
