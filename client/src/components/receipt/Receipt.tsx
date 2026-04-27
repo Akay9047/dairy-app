@@ -11,231 +11,221 @@ interface ReceiptEntry {
   farmer: { name: string; mobile: string; code: string; village: string };
 }
 
-const n = (val: number | undefined, d = 2) => (val ?? 0).toFixed(d);
+const n = (v: number | undefined, d = 2) => (v ?? 0).toFixed(d);
 
 export default function Receipt({ entry, onClose }: { entry: ReceiptEntry; onClose: () => void }) {
-  const milkLabel = entry.milkType === "BUFFALO" ? "Buffalo (Bhains)"
-    : entry.milkType === "COW" ? "Cow (Gaay)" : "Mixed";
+  const milkLabel = entry.milkType === "BUFFALO" ? "Buffalo" : entry.milkType === "COW" ? "Cow (Gaay)" : "Mixed";
+
+  // ── Thermal PDF Download ──────────────────────────
+  const handleDownloadPdf = async () => {
+    try {
+      const { default: jsPDF } = await import("jspdf");
+      const W = 80; // 80mm thermal width
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [W, 200] });
+      let y = 0;
+
+      // Header
+      doc.setFillColor(234, 88, 12);
+      doc.rect(0, 0, W, 16, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(9); doc.setFont("helvetica", "bold");
+      doc.text("SMART DAIRY SOLUTION", W / 2, 7, { align: "center" });
+      doc.setFontSize(6.5); doc.setFont("helvetica", "normal");
+      doc.text("Aapki Apni Digital Dairy — Rajasthan", W / 2, 11, { align: "center" });
+      doc.text("DOODH RASID / RECEIPT", W / 2, 14.5, { align: "center" });
+      doc.setTextColor(0);
+      y = 19;
+
+      const dash = () => {
+        doc.setDrawColor(180); doc.setLineDashPattern([1, 1], 0);
+        doc.line(3, y, W - 3, y); doc.setLineDashPattern([], 0); y += 3;
+      };
+      const row = (lbl: string, val: string, bold = false) => {
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "normal"); doc.setTextColor(100);
+        doc.text(lbl, 4, y);
+        doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setTextColor(0);
+        doc.text(val, W - 4, y, { align: "right" });
+        y += 4;
+      };
+
+      dash();
+      row("Date", format(new Date(entry.date), "dd/MM/yyyy"));
+      row("Time", format(new Date(entry.date), "hh:mm a"));
+      row("Shift", entry.shift === "MORNING" ? "Subah (Morning)" : "Shaam (Evening)");
+      row("Milk", milkLabel);
+      dash();
+      row("Kisaan", entry.farmer.name);
+      row("Code", entry.farmer.code);
+      row("Mobile", entry.farmer.mobile);
+      row("Gaon", entry.farmer.village);
+      dash();
+      row("Doodh", `${n(entry.liters, 1)} Liter`);
+      row("Fat %", `${n(entry.fatPercent, 1)} %`);
+      if (entry.snfPercent && entry.snfPercent > 0) row("SNF %", `${n(entry.snfPercent, 2)} %`);
+      if (entry.fatAmount && entry.fatAmount > 0) row("Fat Amount", `Rs ${n(entry.fatAmount)}`);
+      if (entry.snfAmount && entry.snfAmount > 0) row("SNF Amount", `Rs ${n(entry.snfAmount)}`);
+      row("Rate/Liter", `Rs ${n(entry.ratePerLiter)}`);
+      dash();
+
+      // Total
+      doc.setFillColor(255, 247, 237);
+      doc.roundedRect(4, y - 1, W - 8, 13, 1.5, 1.5, "F");
+      doc.setFontSize(7); doc.setFont("helvetica", "normal"); doc.setTextColor(120);
+      doc.text("Kul Rakam (Total)", W / 2, y + 4, { align: "center" });
+      doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.setTextColor(234, 88, 12);
+      doc.text(`Rs ${n(entry.totalAmount)}`, W / 2, y + 11, { align: "center" });
+      doc.setTextColor(0); y += 17;
+
+      dash();
+      doc.setFontSize(7); doc.setFont("helvetica", "italic"); doc.setTextColor(140);
+      doc.text("Aapke vishwas ka shukriya!", W / 2, y, { align: "center" }); y += 4;
+      doc.text("Smart Dairy Solution", W / 2, y, { align: "center" });
+
+      // Save with proper size
+      const finalDoc = new jsPDF({ orientation: "portrait", unit: "mm", format: [W, y + 8] });
+      // Copy by saving directly
+      doc.save(`rasid-${entry.farmer.code}-${format(new Date(entry.date), "ddMMyyyy-HHmm")}.pdf`);
+      toast.success("PDF download ho gaya! 🖨️");
+    } catch {
+      toast.error("PDF nahi bana");
+    }
+  };
 
   const handlePrint = () => window.print();
 
-  const handleDownloadPdf = async () => {
-    const { default: jsPDF } = await import("jspdf");
-    // 80mm thermal width = ~227px at 72dpi, use 80mm x 200mm
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [80, 180] });
-    const pw = 80;
-    let y = 6;
-
-    const center = (txt: string, size: number, bold = false) => {
-      doc.setFontSize(size);
-      doc.setFont("helvetica", bold ? "bold" : "normal");
-      doc.text(txt, pw / 2, y, { align: "center" });
-      y += size * 0.45;
-    };
-
-    const row = (label: string, value: string, size = 8) => {
-      doc.setFontSize(size);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(80);
-      doc.text(label, 4, y);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(0);
-      doc.text(value, pw - 4, y, { align: "right" });
-      y += size * 0.42;
-    };
-
-    const dashes = () => {
-      doc.setDrawColor(180);
-      doc.setLineDashPattern([1, 1], 0);
-      doc.line(4, y, pw - 4, y);
-      y += 3;
-    };
-
-    // Header
-    doc.setFillColor(234, 88, 12);
-    doc.rect(0, 0, pw, 16, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10); doc.setFont("helvetica", "bold");
-    doc.text("SMART DAIRY SOLUTION", pw / 2, 7, { align: "center" });
-    doc.setFontSize(7); doc.setFont("helvetica", "normal");
-    doc.text("Aapki Apni Digital Dairy", pw / 2, 11, { align: "center" });
-    doc.text("Rajasthan", pw / 2, 14.5, { align: "center" });
-    doc.setTextColor(0);
-    y = 20;
-
-    dashes();
-    row("Date", format(new Date(entry.date), "dd/MM/yyyy"));
-    row("Time", format(new Date(entry.date), "hh:mm a"));
-    row("Shift", entry.shift === "MORNING" ? "Subah" : "Shaam");
-    row("Milk", milkLabel);
-    dashes();
-    row("Farmer", entry.farmer.name);
-    row("Code", entry.farmer.code);
-    row("Mobile", entry.farmer.mobile);
-    row("Village", entry.farmer.village);
-    dashes();
-    row("Doodh", `${n(entry.liters)} L`);
-    row("Fat %", `${n(entry.fatPercent, 1)} %`);
-    if (entry.snfPercent && entry.snfPercent > 0) row("SNF %", `${n(entry.snfPercent)} %`);
-    if (entry.fatAmount && entry.fatAmount > 0) row("Fat Amt", `Rs ${n(entry.fatAmount)}`);
-    if (entry.snfAmount && entry.snfAmount > 0) row("SNF Amt", `Rs ${n(entry.snfAmount)}`);
-    row("Rate/L", `Rs ${n(entry.ratePerLiter)}`);
-    dashes();
-
-    // Total — big
-    doc.setLineDashPattern([], 0);
-    doc.setFillColor(255, 247, 237);
-    doc.rect(4, y - 1, pw - 8, 14, "F");
-    doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(100);
-    doc.text("Kul Rakam (Total)", pw / 2, y + 4, { align: "center" });
-    doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.setTextColor(234, 88, 12);
-    doc.text(`Rs ${n(entry.totalAmount)}`, pw / 2, y + 11, { align: "center" });
-    doc.setTextColor(0);
-    y += 18;
-
-    dashes();
-    doc.setFontSize(7); doc.setFont("helvetica", "normal"); doc.setTextColor(120);
-    doc.text("🙏 Aapke vishwas ka shukriya!", pw / 2, y, { align: "center" }); y += 4;
-    doc.text("Smart Dairy Solution", pw / 2, y, { align: "center" });
-
-    doc.save(`receipt-${entry.farmer.code}-${format(new Date(entry.date), "ddMMyyyyHHmm")}.pdf`);
-    toast.success("PDF download ho gaya! ✅");
-  };
-
   const handleWhatsApp = async () => {
     try {
-      const result = await notifyApi.whatsapp(entry.id);
-      if (result.whatsappUrl) { window.open(result.whatsappUrl, "_blank"); toast.success("WhatsApp khul raha hai! ✅"); }
-      else toast.success("Message bhej diya! ✅");
-    } catch (err: any) { toast.error(err.response?.data?.error ?? "Error"); }
+      const r = await notifyApi.whatsapp(entry.id);
+      if (r.whatsappUrl) { window.open(r.whatsappUrl, "_blank"); toast.success("WhatsApp khul raha hai!"); }
+      else toast.success("Message bhej diya!");
+    } catch (e: any) { toast.error(e.response?.data?.error ?? "Error"); }
   };
 
   const handleSms = async () => {
     try {
-      const result = await notifyApi.sms(entry.id);
-      toast(result.previewMessage ?? "SMS bhej diya!", { icon: "📱", duration: 5000 });
-    } catch (err: any) { toast.error(err.response?.data?.error ?? "Error"); }
+      const r = await notifyApi.sms(entry.id);
+      toast(r.previewMessage ?? "SMS bhej diya!", { icon: "📱", duration: 5000 });
+    } catch (e: any) { toast.error(e.response?.data?.error ?? "Error"); }
   };
 
   return (
     <>
-      {/* Thermal print CSS — 80mm width */}
       <style>{`
         @media print {
-          * { visibility: hidden !important; margin: 0 !important; padding: 0 !important; }
+          * { visibility: hidden !important; }
           .thermal-receipt, .thermal-receipt * { visibility: visible !important; }
           .thermal-receipt {
-            position: fixed !important;
-            top: 0 !important; left: 0 !important;
-            width: 80mm !important;
-            max-width: 80mm !important;
-            font-size: 11px !important;
+            position: fixed !important; top:0 !important; left:0 !important;
+            width: 80mm !important; max-width: 80mm !important;
             font-family: 'Courier New', monospace !important;
+            font-size: 10px !important;
             background: white !important;
-            padding: 4mm !important;
+            padding: 3mm !important;
+            box-shadow: none !important;
           }
           .no-print { display: none !important; }
           @page { margin: 0; size: 80mm auto; }
         }
       `}</style>
 
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-        <div className="bg-white w-full sm:w-96 sm:rounded-2xl shadow-2xl max-h-[95vh] flex flex-col">
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
+        <div className="bg-white w-full sm:w-80 sm:rounded-2xl shadow-2xl flex flex-col max-h-[95vh]">
 
-          {/* Modal Header */}
+          {/* Header */}
           <div className="no-print flex items-center justify-between px-4 py-3 border-b flex-shrink-0">
-            <h2 className="font-bold text-gray-900">Receipt / Rasid</h2>
+            <h2 className="font-bold text-gray-900">Doodh Rasid</h2>
             <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
           </div>
 
-          {/* Thermal Receipt Preview */}
-          <div className="thermal-receipt overflow-y-auto flex-1" style={{ fontFamily: "'Courier New', monospace" }}>
-            {/* Orange Header */}
-            <div className="bg-brand-600 text-white text-center py-3">
-              <p className="font-bold text-sm tracking-wide">🐄 SMART DAIRY SOLUTION</p>
-              <p className="text-xs opacity-90">Aapki Apni Digital Dairy</p>
-              <p className="text-xs opacity-75">Rajasthan</p>
+          {/* Thermal Receipt */}
+          <div className="thermal-receipt overflow-y-auto flex-1" style={{ fontFamily: "'Courier New',monospace", fontSize: 11 }}>
+            {/* Orange header */}
+            <div style={{ background: "#ea580c", color: "white", textAlign: "center", padding: "8px 4px" }}>
+              <div style={{ fontWeight: "bold", fontSize: 13 }}>🐄 SMART DAIRY SOLUTION</div>
+              <div style={{ fontSize: 9, opacity: 0.9 }}>Aapki Apni Digital Dairy</div>
+              <div style={{ fontSize: 9, opacity: 0.75 }}>Rajasthan — DOODH RASID</div>
             </div>
 
-            <div className="px-3 py-2 text-xs" style={{ fontFamily: "'Courier New', monospace" }}>
+            <div style={{ padding: "6px 8px", fontSize: 11 }}>
               {/* Date/Shift */}
-              <div className="border-b border-dashed border-gray-300 pb-2 mb-2 space-y-0.5">
+              <div style={{ borderBottom: "1px dashed #ccc", paddingBottom: 4, marginBottom: 4 }}>
                 {[
                   ["Date", format(new Date(entry.date), "dd/MM/yyyy")],
                   ["Time", format(new Date(entry.date), "hh:mm a")],
                   ["Shift", entry.shift === "MORNING" ? "☀️ Subah" : "🌙 Shaam"],
                   ["Milk", milkLabel],
                 ].map(([l, v]) => (
-                  <div key={l} className="flex justify-between">
-                    <span className="text-gray-500">{l}</span>
-                    <span className="font-semibold">{v}</span>
+                  <div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                    <span style={{ color: "#666" }}>{l}</span>
+                    <span style={{ fontWeight: "bold" }}>{v}</span>
                   </div>
                 ))}
               </div>
 
               {/* Farmer */}
-              <div className="border-b border-dashed border-gray-300 pb-2 mb-2 space-y-0.5">
+              <div style={{ borderBottom: "1px dashed #ccc", paddingBottom: 4, marginBottom: 4 }}>
                 {[
-                  ["Farmer", entry.farmer.name],
+                  ["Kisaan", entry.farmer.name],
                   ["Code", entry.farmer.code],
                   ["Mobile", entry.farmer.mobile],
-                  ["Village", entry.farmer.village],
+                  ["Gaon", entry.farmer.village],
                 ].map(([l, v]) => (
-                  <div key={l} className="flex justify-between">
-                    <span className="text-gray-500">{l}</span>
-                    <span className="font-semibold text-right max-w-[55%] truncate">{v}</span>
+                  <div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                    <span style={{ color: "#666" }}>{l}</span>
+                    <span style={{ fontWeight: "bold" }}>{v}</span>
                   </div>
                 ))}
               </div>
 
               {/* Milk Details */}
-              <div className="border-b border-dashed border-gray-300 pb-2 mb-2 space-y-0.5">
+              <div style={{ borderBottom: "1px dashed #ccc", paddingBottom: 4, marginBottom: 4 }}>
                 {[
-                  ["Doodh", `${n(entry.liters)} Liter`],
+                  ["Doodh", `${n(entry.liters, 1)} L`],
                   ["Fat %", `${n(entry.fatPercent, 1)} %`],
-                  ...(entry.snfPercent && entry.snfPercent > 0 ? [["SNF %", `${n(entry.snfPercent)} %`]] : []),
+                  ...(entry.snfPercent && entry.snfPercent > 0 ? [["SNF %", `${n(entry.snfPercent, 2)} %`]] : []),
                   ...(entry.fatAmount && entry.fatAmount > 0 ? [["Fat Amt", `₹${n(entry.fatAmount)}`]] : []),
                   ...(entry.snfAmount && entry.snfAmount > 0 ? [["SNF Amt", `₹${n(entry.snfAmount)}`]] : []),
-                  ["Rate/Liter", `₹${n(entry.ratePerLiter)}`],
+                  ["Rate/L", `₹${n(entry.ratePerLiter)}`],
                 ].map(([l, v]) => (
-                  <div key={l as string} className="flex justify-between">
-                    <span className="text-gray-500">{l}</span>
-                    <span className="font-semibold">{v}</span>
+                  <div key={l as string} style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                    <span style={{ color: "#666" }}>{l}</span>
+                    <span style={{ fontWeight: "bold" }}>{v as string}</span>
                   </div>
                 ))}
               </div>
 
-              {/* TOTAL */}
-              <div className="bg-orange-50 rounded-lg p-2 text-center border border-orange-100 mb-2">
-                <p className="text-xs text-gray-500 mb-0.5">Kul Rakam (Total)</p>
-                <p className="text-2xl font-bold text-brand-600">₹{n(entry.totalAmount)}</p>
+              {/* Total */}
+              <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 6, padding: "6px 8px", textAlign: "center", marginBottom: 6 }}>
+                <div style={{ fontSize: 10, color: "#888" }}>Kul Rakam (Total)</div>
+                <div style={{ fontSize: 22, fontWeight: "bold", color: "#ea580c" }}>₹{n(entry.totalAmount)}</div>
               </div>
 
-              <div className="text-center text-gray-400 text-xs space-y-0.5 pb-1">
-                <p>🙏 Aapke vishwas ka shukriya!</p>
-                <p>Thank you for your trust!</p>
-                <p className="text-gray-300">━━━━━━━━━━━━━━━━━━━━</p>
-                <p>Smart Dairy Solution</p>
+              <div style={{ textAlign: "center", color: "#aaa", fontSize: 10 }}>
+                <div>🙏 Aapke vishwas ka shukriya!</div>
+                <div>Smart Dairy Solution</div>
+                <div>━━━━━━━━━━━━━━━━━━</div>
+                <div style={{ fontSize: 9 }}>{format(new Date(entry.date), "dd/MM/yyyy hh:mm a")}</div>
               </div>
             </div>
           </div>
 
-          {/* Action Buttons */}
+          {/* Buttons */}
           <div className="no-print p-3 border-t grid grid-cols-2 gap-2 flex-shrink-0">
             <button onClick={handlePrint}
-              className="flex items-center justify-center gap-1.5 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">
-              <Printer size={15} /> Print
+              className="flex items-center justify-center gap-1.5 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50">
+              <Printer size={15} /> Print (80mm)
             </button>
             <button onClick={handleDownloadPdf}
-              className="flex items-center justify-center gap-1.5 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700 transition-colors">
-              <Download size={15} /> PDF
+              className="flex items-center justify-center gap-1.5 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700">
+              <Download size={15} /> PDF (80mm)
             </button>
             <button onClick={handleWhatsApp}
-              className="flex items-center justify-center gap-1.5 py-2.5 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition-colors">
+              className="flex items-center justify-center gap-1.5 py-2.5 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700">
               <MessageCircle size={15} /> WhatsApp
             </button>
             <button onClick={handleSms}
-              className="flex items-center justify-center gap-1.5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors">
+              className="flex items-center justify-center gap-1.5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700">
               <Phone size={15} /> SMS
             </button>
           </div>
