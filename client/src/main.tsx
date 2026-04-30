@@ -8,6 +8,7 @@ import { LanguageProvider } from "./hooks/useLanguage";
 import "./index.css";
 
 import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
 import SuperAdminLoginPage from "./pages/SuperAdminLoginPage";
 import SuperAdminPage from "./pages/SuperAdminPage";
 import Layout from "./components/ui/Layout";
@@ -50,6 +51,7 @@ function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
               <Route path="/super/login" element={<SuperAdminLoginPage />} />
               <Route path="/super/dashboard" element={<SuperAdminRoute><SuperAdminPage /></SuperAdminRoute>} />
               <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
@@ -78,6 +80,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => { });
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
   });
 }

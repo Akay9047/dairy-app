@@ -171,6 +171,10 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+      {/* Register Link */}
+      <Link to="/register" style={{ display: "block", textAlign: "center", marginTop: 8, fontSize: 12, color: "#ea580c", fontWeight: 600, textDecoration: "none" }}>
+        Khud Register Karein →
+      </Link>
 
       {/* Footer */}
       <div style={{ marginTop: 16, display: "flex", gap: 12, alignItems: "center" }}>
