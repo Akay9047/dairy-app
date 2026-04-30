@@ -6,6 +6,7 @@ import { Toaster } from "react-hot-toast";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { LanguageProvider } from "./hooks/useLanguage";
 import "./index.css";
+import InactivePage from "./pages/InactivePage";
 
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -33,6 +34,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     </div>
   );
   if (!admin || admin.role !== "admin") return <Navigate to="/login" replace />;
+  if (!(admin as any).isActive) return <InactivePage />;
   return <>{children}</>;
 }
 
@@ -80,6 +82,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    navigator.serviceWorker.register("/sw.js").catch(() => { });
   });
 }
