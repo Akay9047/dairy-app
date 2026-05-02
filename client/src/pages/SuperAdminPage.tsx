@@ -371,6 +371,118 @@ function DairyCard({ dairy, onRate, onPassword, onToggle, onDelete, onView }: an
   );
 }
 
+
+// ── View Dairy Report Modal ─────────────────────────────────────
+function ViewModal({ dairy, onClose }: { dairy: any; onClose: () => void }) {
+  const { data: report, isLoading } = useQuery({
+    queryKey: ["sa-dairy-report", dairy.id],
+    queryFn: () => superAdminApi.getDairyReport(dairy.id, { period: "month" }),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-4">
+        <div className="flex items-center justify-between p-4 border-b">
+          <div>
+            <h2 className="font-bold text-gray-900">{dairy.name}</h2>
+            <p className="text-xs text-gray-500">{dairy.ownerName} · {dairy.mobile}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
+        </div>
+
+        <div className="p-4 max-h-[70vh] overflow-y-auto">
+          {isLoading ? (
+            <div className="text-center py-8 text-gray-400">Loading report...</div>
+          ) : report ? (
+            <div className="space-y-4">
+              {/* Summary */}
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: "Kul Kisaan", value: String(report.farmers), color: "bg-blue-50 text-blue-700" },
+                  { label: "Kul Entries", value: String(report.milk?.entries ?? 0), color: "bg-orange-50 text-orange-700" },
+                  { label: "Kul Doodh", value: `${(report.milk?.liters ?? 0).toFixed(1)}L`, color: "bg-teal-50 text-teal-700" },
+                  { label: "Kul Kamai", value: `₹${Math.round(report.balance?.earned ?? 0).toLocaleString("en-IN")}`, color: "bg-green-50 text-green-700" },
+                  { label: "Paid", value: `₹${Math.round(report.balance?.paid ?? 0).toLocaleString("en-IN")}`, color: "bg-purple-50 text-purple-700" },
+                  { label: "Baaki", value: `₹${Math.round(report.balance?.pending ?? 0).toLocaleString("en-IN")}`, color: report.balance?.pending > 0 ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700" },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className={`${color.split(" ")[0]} rounded-xl p-3`}>
+                    <p className="text-xs text-gray-500">{label}</p>
+                    <p className={`text-lg font-bold ${color.split(" ")[1]}`}>{value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Rate Config */}
+              {dairy.rateConfig && (
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Rate Settings</p>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Mode</span>
+                      <span className="font-medium">{dairy.rateConfig.pricingMode === "fat_only" ? "📊 Fat Only" : dairy.rateConfig.pricingMode === "fat_snf" ? "🧪 Fat+SNF" : "💰 Fixed"}</span>
+                    </div>
+                    {dairy.rateConfig.pricingMode !== "fixed" && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Fat Rate</span>
+                        <span className="font-medium">₹{dairy.rateConfig.fatRate}/1%/L</span>
+                      </div>
+                    )}
+                    {dairy.rateConfig.pricingMode === "fixed" && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Fixed</span>
+                        <span className="font-medium">🐃₹{dairy.rateConfig.buffaloFixedRate} · 🐄₹{dairy.rateConfig.cowFixedRate}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Recent Entries */}
+              {report.recentEntries?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Recent Entries (Is Mahine)</p>
+                  <div className="space-y-2">
+                    {report.recentEntries.slice(0, 5).map((e: any) => (
+                      <div key={e.id} className="flex items-center justify-between py-2 border-b border-gray-50">
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">{e.farmer?.name} ({e.farmer?.code})</p>
+                          <p className="text-xs text-gray-400">{new Date(e.date).toLocaleDateString("en-IN")} · {e.liters}L · Fat {e.fatPercent}%</p>
+                        </div>
+                        <p className="text-sm font-bold text-brand-600">₹{Math.round(e.totalAmount)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Admin info */}
+              {dairy.admins?.[0] && (
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Admin Details</p>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Username</span>
+                    <span className="font-mono font-medium">{dairy.admins[0].username}</span>
+                  </div>
+                  <div className="flex justify-between text-sm mt-1">
+                    <span className="text-gray-500">Name</span>
+                    <span className="font-medium">{dairy.admins[0].name}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-400">Report load nahi hua</div>
+          )}
+        </div>
+
+        <div className="p-4 border-t">
+          <button onClick={onClose} className="btn-secondary w-full">Band Karein</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Super Admin Page ───────────────────────────────────────
 export default function SuperAdminPage() {
   const { logout } = useAuth();
@@ -493,6 +605,7 @@ export default function SuperAdminPage() {
       {showSAPw && <SAPasswordModal onClose={() => setShowSAPw(false)} />}
       {rateModal && <RateModal dairy={rateModal} onClose={() => setRateModal(null)} />}
       {pwModal && <PasswordModal dairy={pwModal.dairy} admin={pwModal.admin} onClose={() => setPwModal(null)} />}
+      {viewModal && <ViewModal dairy={viewModal} onClose={() => setViewModal(null)} />}
     </div>
   );
 }
