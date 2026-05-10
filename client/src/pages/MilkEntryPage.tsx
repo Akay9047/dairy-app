@@ -67,13 +67,13 @@ function MilkModal({ entry, farmers, onClose }: { entry?: MilkEntry; farmers: Fa
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md my-4">
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40" style={{ paddingBottom: 0 }}>
+      <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-xl w-full md:max-w-md" style={{ maxHeight: "92dvh", display: "flex", flexDirection: "column" }}>
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="font-semibold text-gray-900">{entry ? "Entry Edit Karein" : "Naya " + t("milkEntry")}</h2>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
         </div>
-        <form onSubmit={handleSubmit} className="p-4 space-y-3">
+        <form onSubmit={handleSubmit} className="p-4 space-y-3 overflow-y-auto" style={{ flex: 1, overscrollBehavior: "contain" }}>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t("farmers")} *</label>
             <select className="input-field" value={form.farmerId} onChange={e => setForm({ ...form, farmerId: e.target.value })} required>
